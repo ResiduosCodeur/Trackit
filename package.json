@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "mysql2": "^3.22.4",
     "next": "16.2.7",
+    "next-auth": "^4.24.14",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
