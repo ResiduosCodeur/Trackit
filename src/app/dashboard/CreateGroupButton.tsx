@@ -8,7 +8,7 @@ export default function CreateGroupButton() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: "Goa Trip",
+        name: "Wayanad Trip",
       }),
     });
 
