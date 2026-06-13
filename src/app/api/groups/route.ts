@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+
+interface UserId extends RowDataPacket {
+  id: number;
+}
+
+interface GroupRecord extends RowDataPacket {
+  id: number;
+  name: string;
+  created_by: number;
+  created_at: Date;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,7 +24,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
     }
 
-    const { name } = await req.json();
+    const body: unknown = await req.json();
+    const name =
+      typeof body === "object" &&
+      body !== null &&
+      "name" in body &&
+      typeof body.name === "string"
+        ? body.name.trim()
+        : "";
 
     if (!name) {
       return NextResponse.json(
@@ -21,7 +40,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [users]: any = await db.query(
+    if (name.length > 255) {
+      return NextResponse.json(
+        { error: "Group name must be less than 255 characters" },
+        { status: 400 },
+      );
+    }
+
+    const [users] = await db.query<UserId[]>(
       "SELECT id FROM users WHERE email = ?",
       [session.user.email],
     );
@@ -31,29 +57,42 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = users[0].id;
+    const connection = await db.getConnection();
 
-    const [result]: any = await db.query(
-      `
-        INSERT INTO user_groups (name, created_by)
-        VALUES (?, ?)
+    try {
+      await connection.beginTransaction();
+
+      const [result] = await connection.query<ResultSetHeader>(
+        `
+          INSERT INTO user_groups (name, created_by)
+          VALUES (?, ?)
         `,
-      [name, userId],
-    );
+        [name, userId],
+      );
 
-    const groupId = result.insertId;
+      await connection.query(
+        `
+          INSERT INTO group_members (group_id, user_id)
+          VALUES (?, ?)
+        `,
+        [result.insertId, userId],
+      );
 
-    await db.query(
-  `
-  INSERT INTO group_members (group_id, user_id)
-  VALUES (?, ?)
-  `,
-  [groupId, userId]
-);
+      await connection.commit();
 
-    return NextResponse.json({
-      success: true,
-      groupId,
-    });
+      return NextResponse.json(
+        {
+          success: true,
+          groupId: result.insertId,
+        },
+        { status: 201 },
+      );
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   } catch (error) {
     console.error(error);
 
@@ -71,7 +110,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
     }
 
-    const [users]: any = await db.query(
+    const [users] = await db.query<UserId[]>(
       "SELECT id FROM users WHERE email = ?",
       [session.user.email],
     );
@@ -82,7 +121,7 @@ export async function GET() {
 
     const userId = users[0].id;
 
-    const [groups]: any = await db.query(
+    const [groups] = await db.query<GroupRecord[]>(
       `SELECT * FROM user_groups WHERE created_by = ? ORDER BY created_at DESC`,
       [userId],
     );

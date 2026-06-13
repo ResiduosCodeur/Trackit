@@ -1,42 +1,53 @@
-import React from 'react'
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { RowDataPacket } from "mysql2";
+
+import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import CreateGroupButton from "../dashboard/CreateGroupButton";
 
-async function groups() {
+interface Group extends RowDataPacket {
+  id: number;
+  name: string;
+}
 
-    const session = await getServerSession(authOptions);
-  console.log(session);
+export default async function GroupsPage() {
+  const session = await getServerSession(authOptions);
 
-  const [users]: any = await db.query("SELECT id FROM users WHERE email = ?", [
-    session?.user?.email,
-  ]);
+  if (!session?.user?.email) {
+    redirect("/");
+  }
 
-  const userId = users[0].id;
-
-  const [groups]: any = await db.query(
+  const [groups] = await db.query<Group[]>(
     `
-    SELECT *
-    FROM user_groups
-    WHERE created_by = ?
+      SELECT user_groups.id, user_groups.name
+      FROM user_groups
+      INNER JOIN group_members ON group_members.group_id = user_groups.id
+      INNER JOIN users ON users.id = group_members.user_id
+      WHERE users.email = ?
+      ORDER BY user_groups.created_at DESC
     `,
-    [userId],
+    [session.user.email],
   );
 
   return (
-    <div>
-       <h2>Your Groups</h2>
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
+      <Link className="w-fit text-sm underline" href="/dashboard">
+        Back to dashboard
+      </Link>
+
+      <h1 className="text-3xl font-semibold">Your Groups</h1>
+
+      <CreateGroupButton />
 
       <ul>
-        {groups.map((group: any) => (
+        {groups.map((group) => (
           <li key={group.id}>
             <Link href={`/groups/${group.id}`}>{group.name}</Link>
           </li>
         ))}
       </ul>
-    </div>
-  )
+    </main>
+  );
 }
-
-export default groups
