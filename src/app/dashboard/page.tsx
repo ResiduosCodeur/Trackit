@@ -2,7 +2,6 @@ import React from "react";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import CreateGroupButton from "./CreateGroupButton";
-import { db } from "@/lib/db";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -13,10 +12,6 @@ async function Dashboard() {
   if (!session) {
     redirect('/');
   }
-
-  const [users]: any = await db.query("SELECT id FROM users WHERE email = ?", [
-    session?.user?.email,
-  ]);
 
   return (
     <div>
