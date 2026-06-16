@@ -31,6 +31,9 @@ export default function AddExpenseModal({
   const [isOpen, setIsOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
+  const [paidByUserId, setPaidByUserId] = useState(
+    () => members[0]?.id.toString() ?? "",
+  );
   const [splitType, setSplitType] = useState<SplitType>("equal");
   const [excludedUserIds, setExcludedUserIds] = useState<number[]>([]);
   const [customAmounts, setCustomAmounts] = useState<Record<number, string>>({});
@@ -74,6 +77,11 @@ export default function AddExpenseModal({
       return;
     }
 
+    if (!members.some((member) => member.id.toString() === paidByUserId)) {
+      setError("Choose who paid for the expense.");
+      return;
+    }
+
     if (splitType === "equal-except" && excludedUserIds.length === members.length) {
       setError("At least one member must share the expense.");
       return;
@@ -101,6 +109,7 @@ export default function AddExpenseModal({
         body: JSON.stringify({
           description: description.trim(),
           amount,
+          paidByUserId: Number(paidByUserId),
           splitType,
           excludedUserIds,
           customSplits: members.map((member) => ({
@@ -118,6 +127,7 @@ export default function AddExpenseModal({
 
       setDescription("");
       setAmount("");
+      setPaidByUserId(members[0]?.id.toString() ?? "");
       setSplitType("equal");
       setExcludedUserIds([]);
       setCustomAmounts({});
@@ -205,6 +215,22 @@ export default function AddExpenseModal({
                 </select>
               </label>
 
+              <label className="flex flex-col gap-1">
+                <span>Paid by</span>
+                <select
+                  className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                  value={paidByUserId}
+                  disabled={isSaving}
+                  onChange={(event) => setPaidByUserId(event.target.value)}
+                >
+                  {members.map((member) => (
+                    <option value={member.id} key={member.id}>
+                      {member.name} ({member.email})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               {splitType === "equal-except" ? (
                 <fieldset className="flex flex-col gap-2">
                   <legend className="mb-1 font-medium">Exclude members</legend>
@@ -253,10 +279,6 @@ export default function AddExpenseModal({
                   ))}
                 </fieldset>
               ) : null}
-
-              <p className="text-sm text-black/60 dark:text-white/60">
-                Paid by you
-              </p>
 
               {error ? (
                 <p className="text-sm text-red-600" role="alert">

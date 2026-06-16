@@ -50,7 +50,7 @@ export async function POST(
       return Response.json({ error: "Unauthorised" }, { status: 401 });
     }
 
-    const payerEmail = session.user.email;
+    const viewerEmail = session.user.email;
     const { id } = await params;
     const groupId = Number(id);
 
@@ -73,6 +73,10 @@ export async function POST(
       "splitType" in body && typeof body.splitType === "string"
         ? body.splitType
         : "";
+    const paidByUserId =
+      "paidByUserId" in body && typeof body.paidByUserId === "number"
+        ? body.paidByUserId
+        : null;
 
     if (!description) {
       return Response.json({ error: "Description is required" }, { status: 400 });
@@ -102,9 +106,9 @@ export async function POST(
       `,
       [groupId],
     );
-    const payer = members.find((member) => member.email === payerEmail);
+    const viewer = members.find((member) => member.email === viewerEmail);
 
-    if (!payer) {
+    if (!viewer) {
       return Response.json(
         { error: "Only group members can add expenses" },
         { status: 403 },
@@ -112,6 +116,15 @@ export async function POST(
     }
 
     const memberIds = new Set(members.map((member) => member.id));
+
+    if (
+      paidByUserId === null ||
+      !Number.isInteger(paidByUserId) ||
+      !memberIds.has(paidByUserId)
+    ) {
+      return Response.json({ error: "Invalid payer" }, { status: 400 });
+    }
+
     let splits: { userId: number; cents: number }[];
 
     if (splitType === "equal") {
@@ -194,7 +207,7 @@ export async function POST(
           INSERT INTO expenses (group_id, paid_by, description, amount)
           VALUES (?, ?, ?, ?)
         `,
-        [groupId, payer.id, description, centsToAmount(totalCents)],
+        [groupId, paidByUserId, description, centsToAmount(totalCents)],
       );
       const placeholders = splits.map(() => "(?, ?, ?)").join(", ");
       const values = splits.flatMap((split) => [
