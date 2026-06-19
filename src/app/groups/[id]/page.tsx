@@ -103,7 +103,7 @@ export default async function GroupPage({
   );
 
   const { debts } = await getGroupBalances(groupId);
-  const currentUser = members.find((m) => m.email === session.user.email);
+  const currentUser = members.find((m) => m.email === session?.user?.email);
   const myDebts = debts.filter((d: Debt) => d.from.userId === currentUser?.id);
   const owedToMe = debts.filter((d: Debt) => d.to.userId === currentUser?.id);
 
