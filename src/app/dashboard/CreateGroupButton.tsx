@@ -48,12 +48,12 @@ export default function CreateGroupButton() {
 
   return (
     <form className="flex max-w-md flex-col gap-3" onSubmit={createGroup}>
-      <label className="font-medium" htmlFor="group-name">
+      <label className="text-sm font-medium text-[#EDEFE8]/75" htmlFor="group-name">
         Create a new group
       </label>
       <div className="flex gap-2">
         <input
-          className="min-w-0 flex-1 rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+          className="min-w-0 flex-1 rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
           id="group-name"
           name="name"
           type="text"
@@ -64,7 +64,7 @@ export default function CreateGroupButton() {
           onChange={(event) => setName(event.target.value)}
         />
         <button
-          className="rounded-lg bg-black px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-black"
+          className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
           disabled={isCreating || !name.trim()}
         >
@@ -72,7 +72,7 @@ export default function CreateGroupButton() {
         </button>
       </div>
       {error ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
           {error}
         </p>
       ) : null}

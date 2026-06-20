@@ -8,7 +8,7 @@ export default function SignOutButton() {
 
   return (
     <button
-      className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+      className="rounded-lg bg-[#E0846F]/15 px-4 py-2 text-sm font-medium text-[#E0846F] transition-colors hover:bg-[#E0846F]/25 disabled:cursor-not-allowed disabled:opacity-60"
       type="button"
       disabled={isSigningOut}
       onClick={async () => {

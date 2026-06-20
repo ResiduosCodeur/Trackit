@@ -69,7 +69,7 @@ export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Pr
   return (
     <>
       <button
-        className="rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-black"
+        className="rounded-lg bg-[#EDEFE8] px-3 py-1.5 text-sm font-medium text-[#141812] transition-colors hover:bg-[#EDEFE8]/85"
         type="button"
         onClick={openModal}
       >
@@ -78,7 +78,7 @@ export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Pr
 
       {isOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeModal();
           }}
@@ -86,31 +86,36 @@ export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Pr
           <section
             aria-labelledby="settle-title"
             aria-modal="true"
-            className="w-full max-w-sm rounded-xl bg-white p-6 text-black shadow-xl dark:bg-zinc-900 dark:text-white"
+            className="w-full max-w-sm rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6 text-[#EDEFE8] shadow-xl"
             role="dialog"
           >
             <div className="mb-5 flex items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold" id="settle-title">
+              <h2 className="font-serif text-xl font-semibold" id="settle-title">
                 Settle up
               </h2>
-              <button type="button" disabled={isSaving} onClick={closeModal}>
+              <button
+                className="text-sm text-[#EDEFE8]/45 hover:text-[#EDEFE8]"
+                type="button"
+                disabled={isSaving}
+                onClick={closeModal}
+              >
                 Close
               </button>
             </div>
 
-            <p className="mb-4 text-sm text-black/60 dark:text-white/60">
+            <p className="mb-4 text-sm text-[#EDEFE8]/55">
               Recording a payment to{" "}
-              <span className="font-medium text-black dark:text-white">
+              <span className="font-medium text-[#EDEFE8]">
                 {receiver.name}
               </span>{" "}
               ({receiver.email})
             </p>
 
             <form className="flex flex-col gap-4" onSubmit={settle}>
-              <label className="flex flex-col gap-1">
-                <span>Amount</span>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-[#EDEFE8]/75">Amount</span>
                 <input
-                  className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                  className="tabular-amount rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
                   type="number"
                   value={amount}
                   min="0.01"
@@ -123,17 +128,22 @@ export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Pr
               </label>
 
               {error ? (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
                   {error}
                 </p>
               ) : null}
 
               <div className="flex justify-end gap-2">
-                <button type="button" disabled={isSaving} onClick={closeModal}>
+                <button
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#EDEFE8]/55 hover:text-[#EDEFE8]"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={closeModal}
+                >
                   Cancel
                 </button>
                 <button
-                  className="rounded-lg bg-black px-4 py-2 font-medium text-white disabled:opacity-60 dark:bg-white dark:text-black"
+                  className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
                   type="submit"
                   disabled={isSaving}
                 >

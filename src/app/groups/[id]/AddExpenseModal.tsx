@@ -143,7 +143,7 @@ export default function AddExpenseModal({
   return (
     <>
       <button
-        className="rounded-lg bg-black px-4 py-2 font-medium text-white dark:bg-white dark:text-black"
+        className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84]"
         type="button"
         onClick={() => setIsOpen(true)}
       >
@@ -152,7 +152,7 @@ export default function AddExpenseModal({
 
       {isOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               closeModal();
@@ -162,23 +162,28 @@ export default function AddExpenseModal({
           <section
             aria-labelledby="add-expense-title"
             aria-modal="true"
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 text-black shadow-xl dark:bg-zinc-900 dark:text-white"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6 text-[#EDEFE8] shadow-xl"
             role="dialog"
           >
             <div className="mb-5 flex items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold" id="add-expense-title">
+              <h2 className="font-serif text-xl font-semibold" id="add-expense-title">
                 Add expense
               </h2>
-              <button type="button" disabled={isSaving} onClick={closeModal}>
+              <button
+                className="text-sm text-[#EDEFE8]/45 hover:text-[#EDEFE8]"
+                type="button"
+                disabled={isSaving}
+                onClick={closeModal}
+              >
                 Close
               </button>
             </div>
 
             <form className="flex flex-col gap-4" onSubmit={addExpense}>
-              <label className="flex flex-col gap-1">
-                <span>Description</span>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-[#EDEFE8]/75">Description</span>
                 <input
-                  className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                  className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
                   value={description}
                   maxLength={255}
                   autoFocus
@@ -187,10 +192,10 @@ export default function AddExpenseModal({
                 />
               </label>
 
-              <label className="flex flex-col gap-1">
-                <span>Total amount</span>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-[#EDEFE8]/75">Total amount</span>
                 <input
-                  className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                  className="tabular-amount rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
                   type="number"
                   value={amount}
                   min="0.01"
@@ -201,10 +206,10 @@ export default function AddExpenseModal({
                 />
               </label>
 
-              <label className="flex flex-col gap-1">
-                <span>Split type</span>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-[#EDEFE8]/75">Split type</span>
                 <select
-                  className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                  className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
                   value={splitType}
                   disabled={isSaving}
                   onChange={(event) => setSplitType(event.target.value as SplitType)}
@@ -215,10 +220,10 @@ export default function AddExpenseModal({
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1">
-                <span>Paid by</span>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-[#EDEFE8]/75">Paid by</span>
                 <select
-                  className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                  className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
                   value={paidByUserId}
                   disabled={isSaving}
                   onChange={(event) => setPaidByUserId(event.target.value)}
@@ -232,12 +237,15 @@ export default function AddExpenseModal({
               </label>
 
               {splitType === "equal-except" ? (
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-1 font-medium">Exclude members</legend>
+                <fieldset className="flex flex-col gap-2 rounded-lg border border-[#EDEFE8]/10 p-3">
+                  <legend className="mb-1 px-1 text-sm font-medium text-[#EDEFE8]/75">
+                    Exclude members
+                  </legend>
                   {members.map((member) => (
-                    <label className="flex items-center gap-2" key={member.id}>
+                    <label className="flex items-center gap-2 text-sm text-[#EDEFE8]/90" key={member.id}>
                       <input
                         type="checkbox"
+                        className="size-4 rounded border-[#EDEFE8]/30 bg-[#141812] accent-[#3FA873]"
                         checked={excludedUserIds.includes(member.id)}
                         disabled={isSaving}
                         onChange={(event) =>
@@ -255,13 +263,15 @@ export default function AddExpenseModal({
               ) : null}
 
               {splitType === "custom" ? (
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-1 font-medium">Amount owed by each member</legend>
+                <fieldset className="flex flex-col gap-2 rounded-lg border border-[#EDEFE8]/10 p-3">
+                  <legend className="mb-1 px-1 text-sm font-medium text-[#EDEFE8]/75">
+                    Amount owed by each member
+                  </legend>
                   {members.map((member) => (
                     <label className="flex items-center justify-between gap-3" key={member.id}>
-                      <span className="min-w-0 truncate">{member.name}</span>
+                      <span className="min-w-0 truncate text-sm text-[#EDEFE8]/90">{member.name}</span>
                       <input
-                        className="w-32 rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+                        className="tabular-amount w-32 rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3 py-2 text-sm text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
                         type="number"
                         value={customAmounts[member.id] ?? ""}
                         min="0"
@@ -281,17 +291,22 @@ export default function AddExpenseModal({
               ) : null}
 
               {error ? (
-                <p className="text-sm text-red-600" role="alert">
+                <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
                   {error}
                 </p>
               ) : null}
 
               <div className="flex justify-end gap-2">
-                <button type="button" disabled={isSaving} onClick={closeModal}>
+                <button
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#EDEFE8]/55 hover:text-[#EDEFE8]"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={closeModal}
+                >
                   Cancel
                 </button>
                 <button
-                  className="rounded-lg bg-black px-4 py-2 font-medium text-white disabled:opacity-60 dark:bg-white dark:text-black"
+                  className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
                   type="submit"
                   disabled={isSaving}
                 >

@@ -67,10 +67,10 @@ export default function PasswordSection({ hasPassword }: { hasPassword: boolean 
 
   return (
     <div>
-      <h2 className="text-lg font-semibold">
+      <h2 className="font-serif text-lg font-semibold text-[#EDEFE8]">
         {hasPassword ? "Change password" : "Create a password"}
       </h2>
-      <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+      <p className="mt-1 text-sm text-[#EDEFE8]/50">
         {hasPassword
           ? "Update the password you use to sign in."
           : "You signed up with Google. Set a password to also sign in with email."}
@@ -78,10 +78,10 @@ export default function PasswordSection({ hasPassword }: { hasPassword: boolean 
 
       <form className="mt-4 flex flex-col gap-3" onSubmit={submit}>
         {hasPassword ? (
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Current password</span>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-[#EDEFE8]/75">Current password</span>
             <input
-              className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+              className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
               type="password"
               autoComplete="current-password"
               value={currentPassword}
@@ -91,12 +91,12 @@ export default function PasswordSection({ hasPassword }: { hasPassword: boolean 
           </label>
         ) : null}
 
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-[#EDEFE8]/75">
             {hasPassword ? "New password" : "Password"}
           </span>
           <input
-            className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+            className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
             type="password"
             autoComplete="new-password"
             value={newPassword}
@@ -105,10 +105,10 @@ export default function PasswordSection({ hasPassword }: { hasPassword: boolean 
           />
         </label>
 
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Confirm password</span>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-[#EDEFE8]/75">Confirm password</span>
           <input
-            className="rounded-lg border border-black/20 px-3 py-2 dark:border-white/25"
+            className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
             type="password"
             autoComplete="new-password"
             value={confirmPassword}
@@ -118,19 +118,19 @@ export default function PasswordSection({ hasPassword }: { hasPassword: boolean 
         </label>
 
         {error ? (
-          <p className="text-sm text-red-600" role="alert">
+          <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
             {error}
           </p>
         ) : null}
 
         {success ? (
-          <p className="text-sm text-green-600" role="status">
+          <p className="rounded-lg bg-[#3FA873]/15 px-3 py-2 text-sm text-[#3FA873]" role="status">
             {success}
           </p>
         ) : null}
 
         <button
-          className="mt-1 w-fit rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-white dark:text-black"
+          className="mt-1 w-fit rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
           type="submit"
           disabled={isSaving}
         >
