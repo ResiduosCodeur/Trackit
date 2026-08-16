@@ -9,6 +9,12 @@ interface Member extends RowDataPacket {
   email: string;
 }
 
+interface ExpenseRow extends RowDataPacket {
+  id: number;
+  group_id: number;
+  paid_by: number;
+}
+
 interface CustomSplit {
   userId: number;
   amount: string;
@@ -18,10 +24,8 @@ function amountToCents(value: unknown) {
   if (typeof value !== "string" || !/^\d+(\.\d{1,2})?$/.test(value)) {
     return null;
   }
-
   const [whole, decimal = ""] = value.split(".");
   const cents = Number(whole) * 100 + Number(decimal.padEnd(2, "0"));
-
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
@@ -32,16 +36,45 @@ function centsToAmount(cents: number) {
 function equalSplits(memberIds: number[], totalCents: number) {
   const baseAmount = Math.floor(totalCents / memberIds.length);
   const remainder = totalCents % memberIds.length;
-
   return memberIds.map((userId, index) => ({
     userId,
     cents: baseAmount + (index < remainder ? 1 : 0),
   }));
 }
 
-export async function POST(
+async function getExpenseAndVerifyMember(
+  expenseId: number,
+  groupId: number,
+  viewerEmail: string,
+): Promise<{ expense: ExpenseRow; members: Member[] } | null> {
+  const [expenses] = await db.query<ExpenseRow[]>(
+    `SELECT id, group_id, paid_by FROM expenses WHERE id = ? AND group_id = ? LIMIT 1`,
+    [expenseId, groupId],
+  );
+
+  if (expenses.length === 0) return null;
+
+  const [members] = await db.query<Member[]>(
+    `
+      SELECT users.id, users.email
+      FROM group_members
+      INNER JOIN users ON users.id = group_members.user_id
+      WHERE group_members.group_id = ?
+      ORDER BY users.id
+    `,
+    [groupId],
+  );
+
+  const viewer = members.find((m) => m.email === viewerEmail);
+  if (!viewer) return null;
+
+  return { expense: expenses[0], members };
+}
+
+// PUT /api/groups/[id]/expenses/[expenseId]
+export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string; expenseId: string }> },
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -50,13 +83,25 @@ export async function POST(
       return Response.json({ error: "Unauthorised" }, { status: 401 });
     }
 
-    const viewerEmail = session.user.email;
-    const { id } = await params;
+    const { id, expenseId: expenseIdStr } = await params;
     const groupId = Number(id);
+    const expenseId = Number(expenseIdStr);
 
     if (!Number.isInteger(groupId) || groupId <= 0) {
       return Response.json({ error: "Invalid group ID" }, { status: 400 });
     }
+
+    if (!Number.isInteger(expenseId) || expenseId <= 0) {
+      return Response.json({ error: "Invalid expense ID" }, { status: 400 });
+    }
+
+    const result = await getExpenseAndVerifyMember(expenseId, groupId, session.user.email);
+
+    if (!result) {
+      return Response.json({ error: "Expense not found" }, { status: 404 });
+    }
+
+    const { members } = result;
 
     const body: unknown = await request.json();
 
@@ -96,27 +141,7 @@ export async function POST(
       );
     }
 
-    const [members] = await db.query<Member[]>(
-      `
-        SELECT users.id, users.email
-        FROM group_members
-        INNER JOIN users ON users.id = group_members.user_id
-        WHERE group_members.group_id = ?
-        ORDER BY users.id
-      `,
-      [groupId],
-    );
-
-    const viewer = members.find((member) => member.email === viewerEmail);
-
-    if (!viewer) {
-      return Response.json(
-        { error: "Only group members can add expenses" },
-        { status: 403 },
-      );
-    }
-
-    const memberIds = new Set(members.map((member) => member.id));
+    const memberIds = new Set(members.map((m) => m.id));
 
     if (
       paidByUserId === null ||
@@ -203,38 +228,81 @@ export async function POST(
     try {
       await connection.beginTransaction();
 
-      const [expense] = await connection.query<ResultSetHeader>(
-        `
-          INSERT INTO expenses (group_id, paid_by, description, amount)
-          VALUES (?, ?, ?, ?)
-        `,
-        [groupId, paidByUserId, description, centsToAmount(totalCents)],
+      await connection.query(
+        `UPDATE expenses SET description = ?, amount = ?, paid_by = ? WHERE id = ?`,
+        [description, centsToAmount(totalCents), paidByUserId, expenseId],
+      );
+
+      // Delete old splits and re-insert new ones
+      await connection.query(
+        `DELETE FROM expense_splits WHERE expense_id = ?`,
+        [expenseId],
       );
 
       const placeholders = splits.map(() => "(?, ?, ?)").join(", ");
       const values = splits.flatMap((split) => [
-        expense.insertId,
+        expenseId,
         split.userId,
         centsToAmount(split.cents),
       ]);
 
       await connection.query(
-        `
-          INSERT INTO expense_splits (expense_id, user_id, amount_owed)
-          VALUES ${placeholders}
-        `,
+        `INSERT INTO expense_splits (expense_id, user_id, amount_owed) VALUES ${placeholders}`,
         values,
       );
 
       await connection.commit();
 
-      return Response.json({ success: true, expenseId: expense.insertId }, { status: 201 });
+      return Response.json({ success: true });
     } catch (error) {
       await connection.rollback();
       throw error;
     } finally {
       connection.release();
     }
+  } catch (error) {
+    console.error(error);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// DELETE /api/groups/[id]/expenses/[expenseId]
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string; expenseId: string }> },
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.email) {
+      return Response.json({ error: "Unauthorised" }, { status: 401 });
+    }
+
+    const { id, expenseId: expenseIdStr } = await params;
+    const groupId = Number(id);
+    const expenseId = Number(expenseIdStr);
+
+    if (!Number.isInteger(groupId) || groupId <= 0) {
+      return Response.json({ error: "Invalid group ID" }, { status: 400 });
+    }
+
+    if (!Number.isInteger(expenseId) || expenseId <= 0) {
+      return Response.json({ error: "Invalid expense ID" }, { status: 400 });
+    }
+
+    const result = await getExpenseAndVerifyMember(expenseId, groupId, session.user.email);
+
+    if (!result) {
+      return Response.json({ error: "Expense not found" }, { status: 404 });
+    }
+
+    // expense_splits deleted automatically via ON DELETE CASCADE
+    await db.query<ResultSetHeader>(
+      `DELETE FROM expenses WHERE id = ?`,
+      [expenseId],
+    );
+
+    return Response.json({ success: true });
   } catch (error) {
     console.error(error);
     return Response.json({ error: "Internal server error" }, { status: 500 });

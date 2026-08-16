@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { getGroupBalances } from "@/lib/balances";
 import type { Debt } from "@/lib/balances";
 import AddExpenseModal from "./AddExpenseModal";
+import EditExpenseModal from "./EditExpenseModal";
 import AddMemberForm from "./AddMemberForm";
 import SettleUpModal from "./SettleUpModal";
 
@@ -31,6 +32,7 @@ interface Expense extends RowDataPacket {
   amount: string;
   created_at: Date;
   payer_name: string;
+  paid_by: number;
 }
 
 export default async function GroupPage({
@@ -93,6 +95,7 @@ export default async function GroupPage({
         expenses.description,
         expenses.amount,
         expenses.created_at,
+        expenses.paid_by,
         users.name AS payer_name
       FROM expenses
       INNER JOIN users ON users.id = expenses.paid_by
@@ -107,17 +110,17 @@ export default async function GroupPage({
   const myDebts = debts.filter((d: Debt) => d.from.userId === currentUser?.id);
   const owedToMe = debts.filter((d: Debt) => d.to.userId === currentUser?.id);
 
+  const memberList = members.map((m) => ({ id: m.id, name: m.name, email: m.email }));
+
   return (
     <main className="min-h-screen bg-[#141812]">
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
-        <div className="flex items-center justify-between">
-          <Link
-            className="flex items-center gap-1.5 text-sm font-medium text-[#EDEFE8]/50 transition-colors hover:text-[#EDEFE8]"
-            href="/groups"
-          >
-            ← Back to groups
-          </Link>
-        </div>
+        <Link
+          className="flex w-fit items-center gap-1.5 text-sm font-medium text-[#EDEFE8]/50 transition-colors hover:text-[#EDEFE8]"
+          href="/groups"
+        >
+          ← Back to groups
+        </Link>
 
         {/* Group header */}
         <header>
@@ -146,15 +149,11 @@ export default async function GroupPage({
 
         {/* Balances */}
         <section className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">
-            Balances
-          </h2>
+          <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">Balances</h2>
 
           {myDebts.length === 0 && owedToMe.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[#EDEFE8]/15 bg-[#1C211A]/40 p-6 text-center">
-              <p className="text-sm text-[#EDEFE8]/50">
-                Everyone&apos;s settled up. Nice and tidy.
-              </p>
+              <p className="text-sm text-[#EDEFE8]/50">Everyone&apos;s settled up. Nice and tidy.</p>
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -165,10 +164,7 @@ export default async function GroupPage({
                 >
                   <span className="absolute inset-y-0 left-0 w-[3px] bg-[#3FA873]" />
                   <p className="text-sm text-[#EDEFE8]/75">
-                    <span className="font-medium text-[#EDEFE8]">
-                      {debt.from.name}
-                    </span>{" "}
-                    owes you
+                    <span className="font-medium text-[#EDEFE8]">{debt.from.name}</span> owes you
                   </p>
                   <span className="tabular-amount text-base font-medium text-[#3FA873]">
                     ₹{debt.amount.toFixed(2)}
@@ -182,23 +178,14 @@ export default async function GroupPage({
                   className="relative flex items-center justify-between overflow-hidden rounded-xl border border-[#EDEFE8]/8 bg-[#1C211A] py-3.5 pl-5 pr-4"
                 >
                   <span className="absolute inset-y-0 left-0 w-[3px] bg-[#E0846F]" />
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm text-[#EDEFE8]/75">
-                      You owe{" "}
-                      <span className="font-medium text-[#EDEFE8]">
-                        {debt.to.name}
-                      </span>
-                    </p>
-                  </div>
+                  <p className="text-sm text-[#EDEFE8]/75">
+                    You owe <span className="font-medium text-[#EDEFE8]">{debt.to.name}</span>
+                  </p>
                   <div className="flex items-center gap-3">
                     <span className="tabular-amount text-base font-medium text-[#E0846F]">
                       ₹{debt.amount.toFixed(2)}
                     </span>
-                    <SettleUpModal
-                      groupId={groupId}
-                      receiver={debt.to}
-                      suggestedAmount={debt.amount}
-                    />
+                    <SettleUpModal groupId={groupId} receiver={debt.to} suggestedAmount={debt.amount} />
                   </div>
                 </li>
               ))}
@@ -209,24 +196,15 @@ export default async function GroupPage({
         {/* Expenses */}
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">
-              Expenses
-            </h2>
-            <AddExpenseModal
-              groupId={group.id}
-              members={members.map((member) => ({
-                id: member.id,
-                name: member.name,
-                email: member.email,
-              }))}
-            />
+            <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">Expenses</h2>
+            <AddExpenseModal groupId={group.id} members={memberList} />
           </div>
 
           {expenses.length > 0 ? (
             <ul className="flex flex-col gap-2">
               {expenses.map((expense) => (
                 <li
-                  className="flex items-center justify-between rounded-xl border border-[#EDEFE8]/8 bg-[#1C211A] py-3.5 pl-5 pr-4"
+                  className="flex items-center justify-between rounded-xl border border-[#EDEFE8]/8 bg-[#1C211A] py-3.5 pl-5 pr-3"
                   key={expense.id}
                 >
                   <div>
@@ -234,30 +212,37 @@ export default async function GroupPage({
                       {expense.description || "Expense"}
                     </p>
                     <p className="mt-0.5 text-xs text-[#EDEFE8]/45">
-                      Paid by {expense.payer_name} ·{" "}
-                      {new Date(expense.created_at).toLocaleDateString()}
+                      Paid by {expense.payer_name} · {new Date(expense.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <span className="tabular-amount text-base font-medium text-[#EDEFE8]">
-                    ₹{Number(expense.amount).toFixed(2)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-amount text-base font-medium text-[#EDEFE8]">
+                      ₹{Number(expense.amount).toFixed(2)}
+                    </span>
+                    <EditExpenseModal
+                      groupId={groupId}
+                      expense={{
+                        id: expense.id,
+                        description: expense.description ?? "",
+                        amount: expense.amount,
+                        paidByUserId: expense.paid_by,
+                      }}
+                      members={memberList}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
           ) : (
             <div className="rounded-2xl border border-dashed border-[#EDEFE8]/15 bg-[#1C211A]/40 p-6 text-center">
-              <p className="text-sm text-[#EDEFE8]/50">
-                No expenses yet. Add the first one above.
-              </p>
+              <p className="text-sm text-[#EDEFE8]/50">No expenses yet. Add the first one above.</p>
             </div>
           )}
         </section>
 
         {/* Members */}
         <section className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">
-            Members
-          </h2>
+          <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">Members</h2>
           <ul className="flex flex-wrap gap-2">
             {members.map((member) => (
               <li
