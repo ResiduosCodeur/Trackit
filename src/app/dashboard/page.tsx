@@ -1,79 +1,111 @@
-import { getServerSession } from "next-auth";
 import Image from "next/image";
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
+import PageShell from "@/components/PageShell";
+import { ArrowRightIcon } from "@/components/icons";
 import { authOptions } from "@/lib/auth";
+import { firstName } from "@/lib/format";
+import { getGroupSummaries } from "@/lib/groupSummaries";
 import CreateGroupButton from "./CreateGroupButton";
+import GroupCard from "./GroupCard";
+import Greeting from "./Greeting";
+
+const DASHBOARD_GROUP_LIMIT = 3;
 
 export default async function Dashboard() {
   const session = await getServerSession(authOptions);
 
-  if (!session) {
+  if (!session?.user?.email) {
     redirect("/");
   }
 
+  const groups = await getGroupSummaries(session.user.email);
+  const shown = groups.slice(0, DASHBOARD_GROUP_LIMIT);
+
   return (
-    <main className="min-h-screen bg-[#141812]">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
-        {/* Identity row */}
-        <header className="flex items-center gap-4">
-          {session.user?.image ? (
-            <Image
-              className="rounded-full ring-2 ring-[#EDEFE8]/10"
-              src={session.user.image}
-              alt="Profile"
-              width={56}
-              height={56}
-              unoptimized
-            />
-          ) : (
-            <div className="flex size-14 items-center justify-center rounded-full bg-[#3FA873] font-serif text-xl font-semibold text-[#141812]">
-              {session.user?.name?.charAt(0).toUpperCase() ?? "?"}
-            </div>
-          )}
-          <div>
-            <p className="text-sm font-medium text-[#3FA873]">Welcome back</p>
-            <h1 className="font-serif text-2xl font-semibold text-[#EDEFE8]">
-              {session.user?.name}
-            </h1>
+    <PageShell>
+      {/* Greeting */}
+      <section>
+        <p className="text-xl text-muted sm:text-2xl">
+          <span suppressHydrationWarning>
+            <Greeting />
+          </span>
+        </p>
+        <h1 className="mt-1 flex items-center gap-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
+          {firstName(session.user.name) || "there"}
+          
+        </h1>
+        <p className="mt-2 text-muted sm:text-lg">
+          Keep track of shared expenses, all in one place.
+        </p>
+      </section>
+
+      {/* Create group */}
+      <section className="tk-card relative overflow-hidden p-6 sm:p-8">
+        <div className="relative z-10 max-w-xl">
+          <h2 className="text-2xl font-semibold tracking-tight text-ink">Create a new group</h2>
+          <p className="mt-1.5 text-muted">
+            Start tracking expenses with your friends, roommates or teammates.
+          </p>
+          <div className="mt-6">
+            <CreateGroupButton variant="hero" />
           </div>
-        </header>
+        </div>
+        <CreateIllustration />
+      </section>
 
-        {/* Create group */}
-        <section className="rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6">
-          <CreateGroupButton />
-        </section>
-
-        {/* Quick links */}
-        <section className="grid gap-3 sm:grid-cols-2">
+      {/* Your groups */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-semibold tracking-tight text-ink">Your groups</h2>
+            <span className="rounded-full border border-white/8 bg-surface px-3 py-1 text-sm text-muted">
+              {groups.length} {groups.length === 1 ? "group" : "groups"}
+            </span>
+          </div>
           <Link
             href="/groups"
-            className="group relative overflow-hidden rounded-xl border border-[#EDEFE8]/10 bg-[#1C211A] p-5 transition-colors hover:border-[#3FA873]/40"
+            className="flex items-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-ink/90 transition-colors hover:border-accent/50 hover:text-ink"
           >
-            <span className="absolute inset-y-0 left-0 w-[3px] bg-[#3FA873]/0 transition-colors group-hover:bg-[#3FA873]" />
-            <p className="font-serif text-lg font-semibold text-[#EDEFE8]">
-              All groups
-            </p>
-            <p className="mt-1 text-sm text-[#EDEFE8]/50">
-              See every group you&apos;re part of.
-            </p>
+            All groups
+            <ArrowRightIcon className="text-base" />
           </Link>
+        </div>
 
-          <Link
-            href="/profile"
-            className="group relative overflow-hidden rounded-xl border border-[#EDEFE8]/10 bg-[#1C211A] p-5 transition-colors hover:border-[#3FA873]/40"
-          >
-            <span className="absolute inset-y-0 left-0 w-[3px] bg-[#3FA873]/0 transition-colors group-hover:bg-[#3FA873]" />
-            <p className="font-serif text-lg font-semibold text-[#EDEFE8]">
-              Profile
+        {shown.length > 0 ? (
+          <ul className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {shown.map((group) => (
+              <li key={group.id}>
+                <GroupCard group={group} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/15 bg-surface/40 p-8 text-center">
+            <p className="text-sm text-muted">
+              No groups yet. Create your first one above to get started.
             </p>
-            <p className="mt-1 text-sm text-[#EDEFE8]/50">
-              Manage your account and password.
-            </p>
-          </Link>
-        </section>
-      </div>
-    </main>
+          </div>
+        )}
+      </section>
+    </PageShell>
+  );
+}
+
+/** Decorative artwork on the create-group card (uploaded asset). */
+function CreateIllustration() {
+  return (
+    <Image
+      alt=""
+      aria-hidden="true"
+      className="pointer-events-none absolute -right-2 top-1/2 hidden -translate-y-1/2 lg:block"
+      height={232}
+      priority
+      src="/images/create-illustration.png"
+      unoptimized
+      width={280}
+    />
   );
 }

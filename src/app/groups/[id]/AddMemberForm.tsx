@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
-export default function AddMemberForm({ groupId }: { groupId: number }) {
+export default function AddMemberForm({
+  groupId,
+  onDone,
+}: {
+  groupId: number;
+  onDone?: () => void;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -51,38 +57,46 @@ export default function AddMemberForm({ groupId }: { groupId: number }) {
   }
 
   return (
-    <form className="flex max-w-md flex-col gap-3" onSubmit={addMember}>
-      <label className="text-sm font-medium text-[#EDEFE8]/75" htmlFor="member-email">
-        Add a member
-      </label>
-      <div className="flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-          id="member-email"
-          name="email"
-          type="email"
-          value={email}
-          maxLength={255}
-          placeholder="Member email"
-          autoComplete="email"
-          disabled={isAdding}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <button
-          className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:cursor-not-allowed disabled:opacity-60"
-          type="submit"
-          disabled={isAdding || !email.trim()}
-        >
-          {isAdding ? "Adding..." : "Add"}
-        </button>
+    <form className="flex flex-col gap-3" onSubmit={addMember}>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <label className="min-w-0 flex-1" htmlFor="member-email">
+          <span className="sr-only">Member email</span>
+          <input
+            className="tk-input"
+            id="member-email"
+            name="email"
+            type="email"
+            value={email}
+            maxLength={255}
+            placeholder="Member email"
+            autoComplete="email"
+            autoFocus
+            disabled={isAdding}
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </label>
+        <div className="flex gap-2">
+          <button
+            className="tk-btn-primary flex-1 sm:flex-none"
+            type="submit"
+            disabled={isAdding || !email.trim()}
+          >
+            {isAdding ? "Adding..." : "Add"}
+          </button>
+          {onDone ? (
+            <button className="tk-btn-ghost" type="button" onClick={onDone}>
+              Close
+            </button>
+          ) : null}
+        </div>
       </div>
       {error ? (
-        <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
+        <p className="tk-error" role="alert">
           {error}
         </p>
       ) : null}
       {message ? (
-        <p className="rounded-lg bg-[#3FA873]/15 px-3 py-2 text-sm text-[#3FA873]" role="status">
+        <p className="tk-success" role="status">
           {message}
         </p>
       ) : null}

@@ -3,15 +3,28 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ExpenseIcon } from "@/components/CategoryIcon";
+import ModalShell from "@/components/ModalShell";
+
 interface Props {
   groupId: number;
-  /** The person the current user owes money to */
-  receiver: { userId: number; name: string; email: string };
+  /** The other person in the settlement */
+  counterparty: { userId: number; name: string; email: string };
+  /**
+   * "pay":     the current user owes `counterparty` and is paying them.
+   * "receive": `counterparty` owes the current user and has paid them.
+   */
+  direction: "pay" | "receive";
   /** Pre-fill with the outstanding amount */
   suggestedAmount: number;
 }
 
-export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Props) {
+export default function SettleUpModal({
+  groupId,
+  counterparty,
+  direction,
+  suggestedAmount,
+}: Props) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [amount, setAmount] = useState(suggestedAmount.toFixed(2));
@@ -44,7 +57,9 @@ export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Pr
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          receiverId: receiver.userId,
+          ...(direction === "pay"
+            ? { receiverId: counterparty.userId }
+            : { payerId: counterparty.userId }),
           amount,
           groupId,
         }),
@@ -68,91 +83,61 @@ export default function SettleUpModal({ groupId, receiver, suggestedAmount }: Pr
 
   return (
     <>
-      <button
-        className="rounded-lg bg-[#EDEFE8] px-3 py-1.5 text-sm font-medium text-[#141812] transition-colors hover:bg-[#EDEFE8]/85"
-        type="button"
-        onClick={openModal}
-      >
+      <button className="tk-btn-soft" type="button" onClick={openModal}>
         Settle up
       </button>
 
       {isOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeModal();
-          }}
+        <ModalShell
+          title="Settle up"
+          size="sm"
+          icon={<ExpenseIcon size={48} />}
+          busy={isSaving}
+          onClose={closeModal}
         >
-          <section
-            aria-labelledby="settle-title"
-            aria-modal="true"
-            className="w-full max-w-sm rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6 text-[#EDEFE8] shadow-xl"
-            role="dialog"
-          >
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl font-semibold" id="settle-title">
-                Settle up
-              </h2>
+          <p className="mb-5 text-sm text-muted">
+            {direction === "pay" ? "Recording a payment to" : "Recording a payment received from"}{" "}
+            <span className="font-medium text-ink">{counterparty.name}</span> ({counterparty.email})
+          </p>
+
+          <form className="flex flex-col gap-5" onSubmit={settle}>
+            <label className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-ink/85">Amount (₹)</span>
+              <input
+                className="tk-input !py-3"
+                type="number"
+                inputMode="decimal"
+                value={amount}
+                min="0.01"
+                step="0.01"
+                placeholder="0.00"
+                autoFocus
+                disabled={isSaving}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            </label>
+
+            {error ? (
+              <p className="tk-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-3 border-t border-white/8 pt-5 sm:flex sm:justify-end">
               <button
-                className="text-sm text-[#EDEFE8]/45 hover:text-[#EDEFE8]"
+                className="tk-btn bg-white/6 text-ink hover:bg-white/10 !py-3 sm:min-w-28"
                 type="button"
                 disabled={isSaving}
                 onClick={closeModal}
               >
-                Close
+                Cancel
+              </button>
+              <button className="tk-btn-primary !py-3 sm:min-w-40" type="submit" disabled={isSaving}>
+                {isSaving ? "Saving..." : "Record payment"}
               </button>
             </div>
-
-            <p className="mb-4 text-sm text-[#EDEFE8]/55">
-              Recording a payment to{" "}
-              <span className="font-medium text-[#EDEFE8]">
-                {receiver.name}
-              </span>{" "}
-              ({receiver.email})
-            </p>
-
-            <form className="flex flex-col gap-4" onSubmit={settle}>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-[#EDEFE8]/75">Amount</span>
-                <input
-                  className="tabular-amount rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-                  type="number"
-                  value={amount}
-                  min="0.01"
-                  step="0.01"
-                  placeholder="0.00"
-                  autoFocus
-                  disabled={isSaving}
-                  onChange={(event) => setAmount(event.target.value)}
-                />
-              </label>
-
-              {error ? (
-                <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
-                  {error}
-                </p>
-              ) : null}
-
-              <div className="flex justify-end gap-2">
-                <button
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-[#EDEFE8]/55 hover:text-[#EDEFE8]"
-                  type="button"
-                  disabled={isSaving}
-                  onClick={closeModal}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
-                  type="submit"
-                  disabled={isSaving}
-                >
-                  {isSaving ? "Saving..." : "Record payment"}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
+          </form>
+        </ModalShell>
       ) : null}
     </>
   );

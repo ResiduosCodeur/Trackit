@@ -1,9 +1,10 @@
-import Image from "next/image";
-import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import type { RowDataPacket } from "mysql2";
 
+import Avatar from "@/components/Avatar";
+import PageShell, { BackLink } from "@/components/PageShell";
+import { CalendarIcon, LogOutIcon, MailIcon, UserIcon } from "@/components/icons";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -41,95 +42,75 @@ export default async function ProfilePage() {
     redirect("/");
   }
 
+  const memberSince = new Date(user.created_at).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
-    <main className="min-h-screen bg-[#141812]">
-      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-6 py-12">
-        <Link
-          className="flex w-fit items-center gap-1.5 text-sm font-medium text-[#EDEFE8]/50 transition-colors hover:text-[#EDEFE8]"
-          href="/dashboard"
-        >
-          ← Back to dashboard
-        </Link>
+    <PageShell>
+      <BackLink href="/dashboard">Back to dashboard</BackLink>
 
-        {/* Identity card */}
-        <section className="overflow-hidden rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A]">
-          <div className="bg-gradient-to-br from-[#3FA873]/10 to-transparent px-8 pt-8 pb-6">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              {user.image ? (
-                <Image
-                  className="rounded-full ring-4 ring-[#1C211A]"
-                  src={user.image}
-                  alt={`${user.name}'s profile picture`}
-                  width={96}
-                  height={96}
-                  unoptimized
-                  priority
-                />
-              ) : (
-                <div
-                  className="flex size-24 items-center justify-center rounded-full bg-[#3FA873] font-serif text-3xl font-semibold text-[#141812] ring-4 ring-[#1C211A]"
-                  aria-hidden="true"
-                >
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-              )}
+      {/* Identity card */}
+      <section className="tk-card overflow-hidden bg-gradient-to-br from-accent-strong/12 via-surface to-surface">
+        <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:gap-7 sm:p-8">
+          <span className="w-fit rounded-full bg-accent-strong/20 p-1.5 ring-1 ring-accent/40">
+            <Avatar name={user.name} seed={user.email} image={user.image} size={96} />
+          </span>
 
-              <div>
-                <p className="text-sm font-medium uppercase tracking-wide text-[#EDEFE8]/45">
-                  Your profile
-                </p>
-                <h1 className="font-serif text-2xl font-semibold text-[#EDEFE8] sm:text-3xl">
-                  {user.name}
-                </h1>
-                <p className="mt-0.5 text-[#EDEFE8]/65">{user.email}</p>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+              Your profile
+            </p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+              {user.name}
+            </h1>
+            <p className="mt-1 break-all text-muted sm:text-lg">{user.email}</p>
+          </div>
+        </div>
+
+        <dl className="grid gap-5 border-t border-white/8 px-6 py-5 sm:grid-cols-3 sm:px-8 sm:py-6">
+          {[
+            { label: "Name", value: user.name, Icon: UserIcon },
+            { label: "Email", value: user.email, Icon: MailIcon },
+            { label: "Member since", value: memberSince, Icon: CalendarIcon },
+          ].map(({ label, value, Icon }) => (
+            <div className="flex items-center gap-3" key={label}>
+              <Icon className="shrink-0 text-2xl text-accent" />
+              <div className="min-w-0">
+                <dt className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-muted">
+                  {label}
+                </dt>
+                <dd className="mt-0.5 break-all font-medium text-ink">{value}</dd>
               </div>
             </div>
-          </div>
+          ))}
+        </dl>
+      </section>
 
-          <dl className="grid gap-5 border-t border-[#EDEFE8]/10 px-8 py-6 sm:grid-cols-3">
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-[#EDEFE8]/45">
-                Name
-              </dt>
-              <dd className="mt-1 font-medium text-[#EDEFE8]">{user.name}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-[#EDEFE8]/45">
-                Email
-              </dt>
-              <dd className="mt-1 break-all font-medium text-[#EDEFE8]">{user.email}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-[#EDEFE8]/45">
-                Member since
-              </dt>
-              <dd className="mt-1 font-medium text-[#EDEFE8]">
-                {new Date(user.created_at).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </dd>
-            </div>
-          </dl>
-        </section>
-
+      <div className="grid items-start gap-6 lg:grid-cols-[1.35fr_1fr]">
         {/* Security */}
-        <section className="rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-8">
+        <section className="tk-card p-6 sm:p-8">
           <PasswordSection hasPassword={Boolean(user.password_hash)} />
         </section>
 
         {/* Sign out */}
-        <section className="flex items-center justify-between rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6">
-          <div>
-            <h2 className="font-serif text-lg font-semibold text-[#EDEFE8]">Sign out</h2>
-            <p className="mt-1 text-sm text-[#EDEFE8]/50">
-              End your session on this device.
-            </p>
+        <section className="tk-card p-6 sm:p-7">
+          <div className="flex items-start gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent-strong/20 text-xl text-accent">
+              <LogOutIcon />
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-ink">Sign out</h2>
+              <p className="mt-1 text-sm text-muted">End your session on this device.</p>
+            </div>
           </div>
-          <SignOutButton />
+          <div className="mt-6">
+            <SignOutButton />
+          </div>
         </section>
       </div>
-    </main>
+    </PageShell>
   );
 }

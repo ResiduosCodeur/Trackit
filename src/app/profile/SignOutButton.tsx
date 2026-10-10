@@ -3,12 +3,14 @@
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 
+import { LogOutIcon } from "@/components/icons";
+
 export default function SignOutButton() {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   return (
     <button
-      className="rounded-lg bg-[#E0846F]/15 px-4 py-2 text-sm font-medium text-[#E0846F] transition-colors hover:bg-[#E0846F]/25 disabled:cursor-not-allowed disabled:opacity-60"
+      className="tk-btn-outline w-full !py-3.5"
       type="button"
       disabled={isSigningOut}
       onClick={async () => {
@@ -22,6 +24,7 @@ export default function SignOutButton() {
         }
       }}
     >
+      <LogOutIcon className="text-lg" />
       {isSigningOut ? "Signing out..." : "Sign out"}
     </button>
   );

@@ -1,96 +1,88 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
 
-interface Member {
-  id: number;
-  name: string;
-  email: string;
-}
+import { ExpenseIcon } from "@/components/CategoryIcon";
+import ModalShell from "@/components/ModalShell";
+import { ChevronRightIcon, TrashIcon } from "@/components/icons";
+import ExpenseFields, {
+  ExpenseFormValue,
+  Member,
+  SplitType,
+  expensePayload,
+  validateExpense,
+} from "./expenseForm";
 
 interface Expense {
   id: number;
   description: string;
   amount: string;
   paidByUserId: number;
+  /** How the expense is currently split, detected from the saved splits */
+  split: {
+    splitType: SplitType;
+    excludedUserIds: number[];
+    customAmounts: Record<number, string>;
+  };
 }
 
-type SplitType = "equal" | "custom" | "equal-except";
-
-function amountToCents(value: string) {
-  if (!/^\d+(\.\d{1,2})?$/.test(value)) return null;
-  const [whole, decimal = ""] = value.split(".");
-  return Number(whole) * 100 + Number(decimal.padEnd(2, "0"));
-}
-
+/**
+ * The whole expense row is the trigger (`children` is the row's content);
+ * tapping it opens the edit dialog.
+ */
 export default function EditExpenseModal({
   groupId,
   expense,
   members,
+  children,
 }: {
   groupId: number;
   expense: Expense;
   members: Member[];
+  children: React.ReactNode;
 }) {
   const router = useRouter();
+
+  const initialForm = (): ExpenseFormValue => ({
+    description: expense.description,
+    amount: Number(expense.amount).toFixed(2),
+    paidByUserId: expense.paidByUserId.toString(),
+    splitType: expense.split.splitType,
+    excludedUserIds: expense.split.excludedUserIds,
+    customAmounts: expense.split.customAmounts,
+  });
+
   const [isOpen, setIsOpen] = useState(false);
-  const [description, setDescription] = useState(expense.description);
-  const [amount, setAmount] = useState(Number(expense.amount).toFixed(2));
-  const [paidByUserId, setPaidByUserId] = useState(expense.paidByUserId.toString());
-  const [splitType, setSplitType] = useState<SplitType>("equal");
-  const [excludedUserIds, setExcludedUserIds] = useState<number[]>([]);
-  const [customAmounts, setCustomAmounts] = useState<Record<number, string>>({});
+  const [form, setForm] = useState<ExpenseFormValue>(initialForm);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") closeModal();
-    }
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [isOpen]);
+  const busy = isSaving || isDeleting;
 
-  function openModal() {
-    setDescription(expense.description);
-    setAmount(Number(expense.amount).toFixed(2));
-    setPaidByUserId(expense.paidByUserId.toString());
-    setSplitType("equal");
-    setExcludedUserIds([]);
-    setCustomAmounts({});
+  function open() {
+    setForm(initialForm());
     setError("");
     setConfirmDelete(false);
     setIsOpen(true);
   }
 
-  function closeModal() {
-    if (!isSaving && !isDeleting) {
-      setIsOpen(false);
-      setError("");
-      setConfirmDelete(false);
-    }
+  function close() {
+    if (busy) return;
+    setIsOpen(false);
+    setError("");
+    setConfirmDelete(false);
   }
 
-  async function saveExpense(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const totalCents = amountToCents(amount);
-
-    if (!description.trim()) { setError("Enter an expense description."); return; }
-    if (totalCents === null || totalCents <= 0) { setError("Enter a valid positive amount."); return; }
-    if (!members.some((m) => m.id.toString() === paidByUserId)) { setError("Choose who paid."); return; }
-    if (splitType === "equal-except" && excludedUserIds.length === members.length) {
-      setError("At least one member must share the expense."); return;
-    }
-    if (splitType === "custom") {
-      const customTotal = members.reduce(
-        (sum, member) => sum + (amountToCents(customAmounts[member.id] ?? "0") ?? 0), 0,
-      );
-      if (customTotal !== totalCents) { setError("Custom split amounts must equal the total."); return; }
+    const problem = validateExpense(form, members);
+    if (problem) {
+      setError(problem);
+      return;
     }
 
     setError("");
@@ -100,22 +92,15 @@ export default function EditExpenseModal({
       const response = await fetch(`/api/groups/${groupId}/expenses/${expense.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: description.trim(),
-          amount,
-          paidByUserId: Number(paidByUserId),
-          splitType,
-          excludedUserIds,
-          customSplits: members.map((member) => ({
-            userId: member.id,
-            amount: customAmounts[member.id] || "0",
-          })),
-        }),
+        body: JSON.stringify(expensePayload(form, members)),
       });
 
       const data: { error?: string } = await response.json();
 
-      if (!response.ok) { setError(data.error ?? "Could not update the expense."); return; }
+      if (!response.ok) {
+        setError(data.error ?? "Could not update the expense.");
+        return;
+      }
 
       setIsOpen(false);
       router.refresh();
@@ -127,7 +112,10 @@ export default function EditExpenseModal({
   }
 
   async function deleteExpense() {
-    if (!confirmDelete) { setConfirmDelete(true); return; }
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
 
     setIsDeleting(true);
 
@@ -155,193 +143,72 @@ export default function EditExpenseModal({
   return (
     <>
       <button
-        className="rounded-md px-2 py-1 text-xs font-medium text-[#EDEFE8]/40 transition-colors hover:bg-[#EDEFE8]/8 hover:text-[#EDEFE8]/80"
+        aria-label={`Edit ${expense.description || "expense"}`}
+        className="tk-card group flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:border-accent/40 hover:bg-surface-2 sm:gap-4 sm:px-5"
         type="button"
-        onClick={openModal}
+        onClick={open}
       >
-        Edit
+        {children}
+        <ChevronRightIcon className="shrink-0 text-xl text-ink/70 transition-colors group-hover:text-accent" />
       </button>
 
       {isOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) closeModal();
-          }}
-        >
-          <section
-            aria-labelledby="edit-expense-title"
-            aria-modal="true"
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6 text-[#EDEFE8] shadow-xl"
-            role="dialog"
-          >
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <h2 className="font-serif text-xl font-semibold" id="edit-expense-title">
-                Edit expense
-              </h2>
+        <ModalShell title="Edit expense" icon={<ExpenseIcon size={48} />} busy={busy} onClose={close}>
+          <form className="flex flex-col gap-5" onSubmit={save}>
+            <ExpenseFields value={form} onChange={setForm} members={members} disabled={busy} />
+
+            {error ? (
+              <p className="tk-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="flex flex-col gap-3 border-t border-white/8 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <button
-                className="text-sm text-[#EDEFE8]/45 hover:text-[#EDEFE8]"
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-medium transition-colors max-sm:border ${
+                  confirmDelete
+                    ? "bg-neg/20 text-neg max-sm:border-neg"
+                    : "text-neg hover:bg-neg/10 max-sm:border-neg/50"
+                }`}
                 type="button"
-                disabled={isSaving || isDeleting}
-                onClick={closeModal}
+                disabled={busy}
+                onClick={deleteExpense}
               >
-                Close
+                <TrashIcon className="text-lg" />
+                {isDeleting ? "Deleting..." : confirmDelete ? "Confirm delete" : "Delete expense"}
               </button>
-            </div>
 
-            <form className="flex flex-col gap-4" onSubmit={saveExpense}>
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-[#EDEFE8]/75">Description</span>
-                <input
-                  className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-                  value={description}
-                  maxLength={255}
-                  autoFocus
-                  disabled={isSaving || isDeleting}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-[#EDEFE8]/75">Total amount</span>
-                <input
-                  className="tabular-amount rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-                  type="number"
-                  value={amount}
-                  min="0.01"
-                  step="0.01"
-                  placeholder="0.00"
-                  disabled={isSaving || isDeleting}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-[#EDEFE8]/75">Split type</span>
-                <select
-                  className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-                  value={splitType}
-                  disabled={isSaving || isDeleting}
-                  onChange={(e) => setSplitType(e.target.value as SplitType)}
-                >
-                  <option value="equal">Equally among all</option>
-                  <option value="custom">Custom split</option>
-                  <option value="equal-except">Equally except...</option>
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-[#EDEFE8]/75">Paid by</span>
-                <select
-                  className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-                  value={paidByUserId}
-                  disabled={isSaving || isDeleting}
-                  onChange={(e) => setPaidByUserId(e.target.value)}
-                >
-                  {members.map((member) => (
-                    <option value={member.id} key={member.id}>
-                      {member.name} ({member.email})
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {splitType === "equal-except" ? (
-                <fieldset className="flex flex-col gap-2 rounded-lg border border-[#EDEFE8]/10 p-3">
-                  <legend className="mb-1 px-1 text-sm font-medium text-[#EDEFE8]/75">Exclude members</legend>
-                  {members.map((member) => (
-                    <label className="flex items-center gap-2 text-sm text-[#EDEFE8]/90" key={member.id}>
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-[#3FA873]"
-                        checked={excludedUserIds.includes(member.id)}
-                        disabled={isSaving || isDeleting}
-                        onChange={(e) =>
-                          setExcludedUserIds((cur) =>
-                            e.target.checked ? [...cur, member.id] : cur.filter((id) => id !== member.id),
-                          )
-                        }
-                      />
-                      {member.name} ({member.email})
-                    </label>
-                  ))}
-                </fieldset>
-              ) : null}
-
-              {splitType === "custom" ? (
-                <fieldset className="flex flex-col gap-2 rounded-lg border border-[#EDEFE8]/10 p-3">
-                  <legend className="mb-1 px-1 text-sm font-medium text-[#EDEFE8]/75">Amount owed by each member</legend>
-                  {members.map((member) => (
-                    <label className="flex items-center justify-between gap-3" key={member.id}>
-                      <span className="min-w-0 truncate text-sm text-[#EDEFE8]/90">{member.name}</span>
-                      <input
-                        className="tabular-amount w-32 rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3 py-2 text-sm text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-                        type="number"
-                        value={customAmounts[member.id] ?? ""}
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        disabled={isSaving || isDeleting}
-                        onChange={(e) =>
-                          setCustomAmounts((cur) => ({ ...cur, [member.id]: e.target.value }))
-                        }
-                      />
-                    </label>
-                  ))}
-                </fieldset>
-              ) : null}
-
-              {error ? (
-                <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
-                  {error}
-                </p>
-              ) : null}
-
-              <div className="flex items-center justify-between gap-2 border-t border-[#EDEFE8]/8 pt-4">
+              {confirmDelete ? (
                 <button
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    confirmDelete
-                      ? "bg-[#E0846F]/20 text-[#E0846F] hover:bg-[#E0846F]/30"
-                      : "text-[#E0846F]/60 hover:bg-[#E0846F]/10 hover:text-[#E0846F]"
-                  }`}
+                  className="tk-btn bg-white/6 text-ink hover:bg-white/10 !py-3"
                   type="button"
-                  disabled={isSaving || isDeleting}
-                  onClick={deleteExpense}
+                  disabled={isDeleting}
+                  onClick={() => setConfirmDelete(false)}
                 >
-                  {isDeleting ? "Deleting..." : confirmDelete ? "Confirm delete" : "Delete expense"}
+                  Keep expense
                 </button>
-
-                {confirmDelete ? (
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:flex">
                   <button
-                    className="text-sm text-[#EDEFE8]/45 hover:text-[#EDEFE8]"
+                    className="tk-btn bg-white/6 text-ink hover:bg-white/10 !py-3 sm:min-w-28"
                     type="button"
-                    onClick={() => setConfirmDelete(false)}
+                    disabled={busy}
+                    onClick={close}
                   >
                     Cancel
                   </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      className="rounded-lg px-4 py-2 text-sm font-medium text-[#EDEFE8]/55 hover:text-[#EDEFE8]"
-                      type="button"
-                      disabled={isSaving}
-                      onClick={closeModal}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
-                      type="submit"
-                      disabled={isSaving || isDeleting}
-                    >
-                      {isSaving ? "Saving..." : "Save changes"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </form>
-          </section>
-        </div>
+                  <button
+                    className="tk-btn-primary !py-3 sm:min-w-36"
+                    type="submit"
+                    disabled={busy}
+                  >
+                    {isSaving ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </form>
+        </ModalShell>
       ) : null}
     </>
   );

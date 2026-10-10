@@ -1,16 +1,14 @@
-import { getServerSession } from "next-auth";
 import Link from "next/link";
+import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import type { RowDataPacket } from "mysql2";
 
+import { GroupIcon } from "@/components/CategoryIcon";
+import PageShell, { BackLink } from "@/components/PageShell";
+import { ArrowRightIcon } from "@/components/icons";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { getGroupSummaries } from "@/lib/groupSummaries";
 import CreateGroupButton from "../dashboard/CreateGroupButton";
-
-interface Group extends RowDataPacket {
-  id: number;
-  name: string;
-}
+import FocusCreateButton from "./FocusCreateButton";
 
 export default async function GroupsPage() {
   const session = await getServerSession(authOptions);
@@ -19,67 +17,59 @@ export default async function GroupsPage() {
     redirect("/");
   }
 
-  const [groups] = await db.query<Group[]>(
-    `
-      SELECT user_groups.id, user_groups.name
-      FROM user_groups
-      INNER JOIN group_members ON group_members.group_id = user_groups.id
-      INNER JOIN users ON users.id = group_members.user_id
-      WHERE users.email = ?
-      ORDER BY user_groups.created_at DESC
-    `,
-    [session.user.email],
-  );
+  const groups = await getGroupSummaries(session.user.email);
 
   return (
-    <main className="min-h-screen bg-[#141812]">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
-        <Link
-          className="flex w-fit items-center gap-1.5 text-sm font-medium text-[#EDEFE8]/50 transition-colors hover:text-[#EDEFE8]"
-          href="/dashboard"
-        >
-          ← Back to dashboard
-        </Link>
+    <PageShell>
+      <BackLink href="/dashboard">Back to dashboard</BackLink>
 
-        <header>
-          <p className="flex items-center gap-2 text-sm font-medium text-[#3FA873]">
-            <span className="h-px w-5 bg-[#3FA873]" />
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <p className="tk-eyebrow">
+            <span className="h-px w-6 bg-accent" />
             All groups
           </p>
-          <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tight text-[#EDEFE8]">
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
             Your groups
           </h1>
-        </header>
+        </div>
+        <div className="hidden sm:block">
+          <FocusCreateButton />
+        </div>
+      </header>
 
-        <section className="rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-6">
-          <CreateGroupButton />
-        </section>
+      <section className="tk-card p-6">
+        <h2 className="mb-4 text-lg font-semibold text-ink">Create a new group</h2>
+        <CreateGroupButton variant="compact" />
+      </section>
 
-        {groups.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {groups.map((group) => (
-              <li key={group.id}>
-                <Link
-                  href={`/groups/${group.id}`}
-                  className="group relative flex items-center justify-between overflow-hidden rounded-xl border border-[#EDEFE8]/10 bg-[#1C211A] px-5 py-4 transition-colors hover:border-[#3FA873]/40"
-                >
-                  <span className="absolute inset-y-0 left-0 w-[3px] bg-[#3FA873]/0 transition-colors group-hover:bg-[#3FA873]" />
-                  <span className="font-medium text-[#EDEFE8]">{group.name}</span>
-                  <span className="text-[#EDEFE8]/40 transition-colors group-hover:text-[#3FA873]">
-                    →
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-[#EDEFE8]/15 bg-[#1C211A]/40 p-6 text-center">
-            <p className="text-sm text-[#EDEFE8]/50">
-              No groups yet. Create one above to get started.
-            </p>
-          </div>
-        )}
-      </div>
-    </main>
+      {groups.length > 0 ? (
+        <ul className="flex flex-col gap-3">
+          {groups.map((group) => (
+            <li key={group.id}>
+              <Link
+                href={`/groups/${group.id}`}
+                className="group tk-card flex items-center gap-4 p-4 transition-colors hover:border-accent/40 hover:bg-surface-2 sm:px-5"
+              >
+                <GroupIcon size={52} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-semibold text-ink">{group.name}</p>
+                  <p className="text-sm text-muted">
+                    {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
+                  </p>
+                </div>
+                <span className="flex size-10 items-center justify-center rounded-full bg-white/6 text-lg text-ink/80 transition-colors group-hover:bg-accent-strong group-hover:text-white">
+                  <ArrowRightIcon />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-white/15 bg-surface/40 p-8 text-center">
+          <p className="text-sm text-muted">No groups yet. Create one above to get started.</p>
+        </div>
+      )}
+    </PageShell>
   );
 }

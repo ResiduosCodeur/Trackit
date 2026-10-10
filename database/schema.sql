@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS settlements (
     payer_id INT NOT NULL,
     receiver_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
+    group_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (payer_id)
@@ -90,3 +91,6 @@ ON settlements(payer_id);
 
 CREATE INDEX idx_settlements_receiver
 ON settlements(receiver_id);
+
+CREATE INDEX idx_settlements_group
+ON settlements(group_id);

@@ -3,7 +3,18 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
-export default function CreateGroupButton() {
+import { ArrowRightIcon, UsersIcon } from "@/components/icons";
+
+/**
+ * Create-group form.
+ *  - "hero":    dashboard card, arrow on the button
+ *  - "compact": the all-groups page, plain "Create" button
+ */
+export default function CreateGroupButton({
+  variant = "hero",
+}: {
+  variant?: "hero" | "compact";
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -46,33 +57,37 @@ export default function CreateGroupButton() {
     }
   }
 
+  const label = isCreating ? "Creating..." : variant === "hero" ? "Create group" : "Create";
+
   return (
-    <form className="flex max-w-md flex-col gap-3" onSubmit={createGroup}>
-      <label className="text-sm font-medium text-[#EDEFE8]/75" htmlFor="group-name">
-        Create a new group
-      </label>
-      <div className="flex gap-2">
-        <input
-          className="min-w-0 flex-1 rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-          id="group-name"
-          name="name"
-          type="text"
-          value={name}
-          maxLength={255}
-          placeholder="Group name"
-          disabled={isCreating}
-          onChange={(event) => setName(event.target.value)}
-        />
+    <form className="flex flex-col gap-3" onSubmit={createGroup}>
+      <div className={`flex gap-3 ${variant === "hero" ? "flex-col sm:flex-row" : "flex-col sm:flex-row"}`}>
+        <label className="relative min-w-0 flex-1" htmlFor="group-name">
+          <span className="sr-only">Group name</span>
+          <UsersIcon className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl text-muted" />
+          <input
+            className="tk-input !py-3.5 !pl-12"
+            id="group-name"
+            name="name"
+            type="text"
+            value={name}
+            maxLength={255}
+            placeholder="Group name"
+            disabled={isCreating}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
         <button
-          className="rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:cursor-not-allowed disabled:opacity-60"
+          className="tk-btn-primary !py-3.5 sm:px-6"
           type="submit"
           disabled={isCreating || !name.trim()}
         >
-          {isCreating ? "Creating..." : "Create"}
+          {label}
+          {variant === "hero" && !isCreating ? <ArrowRightIcon className="text-lg" /> : null}
         </button>
       </div>
       {error ? (
-        <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
+        <p className="tk-error" role="alert">
           {error}
         </p>
       ) : null}

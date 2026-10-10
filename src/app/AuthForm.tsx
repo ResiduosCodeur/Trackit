@@ -4,6 +4,8 @@ import { FormEvent, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
+import { EyeIcon, EyeOffIcon, LockIcon, MailIcon, UserIcon } from "@/components/icons";
+
 type Mode = "sign-in" | "sign-up";
 
 export default function AuthForm() {
@@ -13,6 +15,7 @@ export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -57,10 +60,8 @@ export default function AuthForm() {
   }
 
   return (
-    <section className="relative w-full max-w-[420px] justify-self-center rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-8 shadow-[0_1px_2px_rgba(0,0,0,0.3),0_12px_32px_-8px_rgba(0,0,0,0.5)]">
-      <span className="absolute left-0 top-8 h-10 w-[3px] rounded-r bg-[#3FA873]" />
-
-      <div className="mb-7 flex rounded-lg bg-[#141812] p-1">
+    <section className="tk-card relative w-full max-w-[420px] justify-self-center p-8 shadow-2xl shadow-black/40">
+      <div className="mb-7 flex rounded-xl bg-bg p-1">
         {(["sign-in", "sign-up"] as Mode[]).map((option) => (
           <button
             key={option}
@@ -69,10 +70,10 @@ export default function AuthForm() {
               setMode(option);
               setError("");
             }}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
               mode === option
-                ? "bg-[#2A2F26] text-[#EDEFE8] shadow-sm"
-                : "text-[#EDEFE8]/45 hover:text-[#EDEFE8]/80"
+                ? "bg-accent-strong/25 text-ink"
+                : "text-muted hover:text-ink"
             }`}
           >
             {option === "sign-in" ? "Sign in" : "Create account"}
@@ -80,10 +81,10 @@ export default function AuthForm() {
         ))}
       </div>
 
-      <h2 className="font-serif text-2xl font-semibold tracking-tight text-[#EDEFE8]">
+      <h2 className="text-2xl font-semibold tracking-tight text-ink">
         {mode === "sign-in" ? "Welcome back" : "Start your ledger"}
       </h2>
-      <p className="mt-1 text-sm text-[#EDEFE8]/50">
+      <p className="mt-1 text-sm text-muted">
         {mode === "sign-in"
           ? "Sign in to see your groups and balances."
           : "Takes under a minute. No card required."}
@@ -92,54 +93,75 @@ export default function AuthForm() {
       <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
         {mode === "sign-up" ? (
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-[#EDEFE8]/75">Name</span>
-            <input
-              className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-              type="text"
-              autoComplete="name"
-              required
-              disabled={isSubmitting}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-            />
+            <span className="text-sm font-medium text-ink/85">Name</span>
+            <span className="relative block">
+              <UserIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xl text-muted" />
+              <input
+                className="tk-input !pl-11"
+                type="text"
+                autoComplete="name"
+                placeholder="Your name"
+                required
+                disabled={isSubmitting}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </span>
           </label>
         ) : null}
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#EDEFE8]/75">Email</span>
-          <input
-            className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-            type="email"
-            autoComplete="email"
-            required
-            disabled={isSubmitting}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
+          <span className="text-sm font-medium text-ink/85">Email</span>
+          <span className="relative block">
+            <MailIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xl text-muted" />
+            <input
+              className="tk-input !pl-11"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              required
+              disabled={isSubmitting}
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </span>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#EDEFE8]/75">Password</span>
-          <input
-            className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-            type="password"
-            autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-            required
-            minLength={8}
-            disabled={isSubmitting}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+          <span className="text-sm font-medium text-ink/85">Password</span>
+          <span className="relative block">
+            <LockIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xl text-muted" />
+            <input
+              className="tk-input !pl-11 !pr-12"
+              type={showPassword ? "text" : "password"}
+              autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+              placeholder={mode === "sign-in" ? "Enter your password" : "At least 8 characters"}
+              required
+              minLength={8}
+              disabled={isSubmitting}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xl text-muted transition-colors hover:text-ink"
+              tabIndex={-1}
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+            >
+              {showPassword ? <EyeIcon /> : <EyeOffIcon />}
+            </button>
+          </span>
         </label>
 
         {error ? (
-          <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
+          <p className="tk-error" role="alert">
             {error}
           </p>
         ) : null}
 
         <button
-          className="mt-1 rounded-lg bg-[#3FA873] py-2.5 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
+          className="tk-btn-primary mt-1 w-full !py-3"
           type="submit"
           disabled={isSubmitting}
         >
@@ -152,16 +174,16 @@ export default function AuthForm() {
       </form>
 
       <div className="my-6 flex items-center gap-3">
-        <span className="h-px flex-1 bg-[#EDEFE8]/10" />
-        <span className="text-xs uppercase tracking-wide text-[#EDEFE8]/35">or</span>
-        <span className="h-px flex-1 bg-[#EDEFE8]/10" />
+        <span className="h-px flex-1 bg-ink/10" />
+        <span className="text-xs uppercase tracking-wide text-muted">or</span>
+        <span className="h-px flex-1 bg-ink/10" />
       </div>
 
       <button
         type="button"
         disabled={isSubmitting}
         onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-        className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-[#EDEFE8]/15 bg-[#141812] py-2.5 text-sm font-medium text-[#EDEFE8] transition-colors hover:bg-[#EDEFE8]/[0.06] disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-white/12 bg-bg py-2.5 text-sm font-medium text-ink transition-colors hover:bg-white/6 disabled:opacity-60"
       >
         <svg width="18" height="18" viewBox="0 0 18 18">
           <path

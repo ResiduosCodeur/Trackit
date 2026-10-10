@@ -3,6 +3,9 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { LockIcon } from "@/components/icons";
+import PasswordField from "./PasswordField";
+
 export default function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState("");
@@ -67,73 +70,64 @@ export default function PasswordSection({ hasPassword }: { hasPassword: boolean 
 
   return (
     <div>
-      <h2 className="font-serif text-lg font-semibold text-[#EDEFE8]">
-        {hasPassword ? "Change password" : "Create a password"}
-      </h2>
-      <p className="mt-1 text-sm text-[#EDEFE8]/50">
-        {hasPassword
-          ? "Update the password you use to sign in."
-          : "You signed up with Google. Set a password to also sign in with email."}
-      </p>
+      <div className="flex items-start gap-3">
+        <LockIcon className="mt-1 text-2xl text-ink/85" />
+        <div>
+          <h2 className="text-xl font-semibold text-ink">
+            {hasPassword ? "Change password" : "Create a password"}
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            {hasPassword
+              ? "Update your password to keep your account secure."
+              : "You signed up with Google. Set a password to also sign in with email."}
+          </p>
+        </div>
+      </div>
 
-      <form className="mt-4 flex flex-col gap-3" onSubmit={submit}>
+      <form className="mt-6 flex flex-col gap-4" onSubmit={submit}>
         {hasPassword ? (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-[#EDEFE8]/75">Current password</span>
-            <input
-              className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-              type="password"
-              autoComplete="current-password"
-              value={currentPassword}
-              disabled={isSaving}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-            />
-          </label>
+          <PasswordField
+            label="Current password"
+            placeholder="Enter your current password"
+            autoComplete="current-password"
+            value={currentPassword}
+            disabled={isSaving}
+            onChange={setCurrentPassword}
+          />
         ) : null}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#EDEFE8]/75">
-            {hasPassword ? "New password" : "Password"}
-          </span>
-          <input
-            className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-            type="password"
-            autoComplete="new-password"
-            value={newPassword}
-            disabled={isSaving}
-            onChange={(event) => setNewPassword(event.target.value)}
-          />
-        </label>
+        <PasswordField
+          label={hasPassword ? "New password" : "Password"}
+          placeholder={hasPassword ? "Enter your new password" : "Choose a password"}
+          autoComplete="new-password"
+          value={newPassword}
+          disabled={isSaving}
+          onChange={setNewPassword}
+        />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-[#EDEFE8]/75">Confirm password</span>
-          <input
-            className="rounded-lg border border-[#EDEFE8]/15 bg-[#141812] px-3.5 py-2.5 text-[#EDEFE8] outline-none transition-colors focus:border-[#3FA873] focus:ring-2 focus:ring-[#3FA873]/20"
-            type="password"
-            autoComplete="new-password"
-            value={confirmPassword}
-            disabled={isSaving}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-          />
-        </label>
+        <PasswordField
+          label="Confirm password"
+          placeholder="Confirm your new password"
+          autoComplete="new-password"
+          value={confirmPassword}
+          disabled={isSaving}
+          onChange={setConfirmPassword}
+        />
 
         {error ? (
-          <p className="rounded-lg bg-[#E0846F]/15 px-3 py-2 text-sm text-[#E0846F]" role="alert">
+          <p className="tk-error" role="alert">
             {error}
           </p>
         ) : null}
 
         {success ? (
-          <p className="rounded-lg bg-[#3FA873]/15 px-3 py-2 text-sm text-[#3FA873]" role="status">
+          <p className="tk-success" role="status">
             {success}
           </p>
         ) : null}
 
-        <button
-          className="mt-1 w-fit rounded-lg bg-[#3FA873] px-4 py-2 text-sm font-semibold text-[#141812] transition-colors hover:bg-[#4DBB84] disabled:opacity-60"
-          type="submit"
-          disabled={isSaving}
-        >
+        <button className="tk-btn-primary mt-2 w-full !py-3.5" type="submit" disabled={isSaving}>
+          <LockIcon className="text-lg" />
           {isSaving ? "Saving..." : hasPassword ? "Update password" : "Create password"}
         </button>
       </form>

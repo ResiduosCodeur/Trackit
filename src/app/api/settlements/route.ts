@@ -20,10 +20,13 @@ function amountToCents(value: unknown): number | null {
 /**
  * POST /api/settlements
  *
- * Body: { receiverId: number; amount: string; groupId?: number }
+ * Body: { amount: string; groupId: number } plus exactly one of:
+ *   - receiverId: the current user paid `receiverId`
+ *   - payerId:    `payerId` paid the current user (recorded by the person
+ *                 who received the money)
  *
- * Records the current user paying `amount` to `receiverId`.
- * groupId is optional — used only to validate both parties share a group.
+ * The settlement is stored against the group so it only affects that
+ * group's balances.
  */
 export async function POST(request: Request) {
   try {
@@ -39,21 +42,38 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const receiverId =
+    const receiverIdInput =
       "receiverId" in body && typeof body.receiverId === "number"
         ? body.receiverId
         : null;
 
-    const amount =
-      "amount" in body ? amountToCents(body.amount) : null;
+    const payerIdInput =
+      "payerId" in body && typeof body.payerId === "number"
+        ? body.payerId
+        : null;
+
+    const amount = "amount" in body ? amountToCents(body.amount) : null;
 
     const groupId =
       "groupId" in body && typeof body.groupId === "number"
         ? body.groupId
         : null;
 
-    if (receiverId === null || !Number.isInteger(receiverId) || receiverId <= 0) {
-      return Response.json({ error: "Invalid receiver" }, { status: 400 });
+    if ((receiverIdInput === null) === (payerIdInput === null)) {
+      return Response.json(
+        { error: "Provide exactly one of receiverId or payerId" },
+        { status: 400 },
+      );
+    }
+
+    const otherUserId = (receiverIdInput ?? payerIdInput) as number;
+
+    if (!Number.isInteger(otherUserId) || otherUserId <= 0) {
+      return Response.json({ error: "Invalid user" }, { status: 400 });
+    }
+
+    if (groupId === null || !Number.isInteger(groupId) || groupId <= 0) {
+      return Response.json({ error: "Invalid group" }, { status: 400 });
     }
 
     if (amount === null || amount <= 0 || amount > 9_999_999_999) {
@@ -63,57 +83,49 @@ export async function POST(request: Request) {
       );
     }
 
-    // Resolve payer from session email
-    const [[payer]] = await db.query<UserRow[]>(
+    // Resolve the current user from the session email
+    const [[me]] = await db.query<UserRow[]>(
       "SELECT id FROM users WHERE email = ? LIMIT 1",
       [session.user.email],
     );
 
-    if (!payer) {
+    if (!me) {
       return Response.json({ error: "Unauthorised" }, { status: 401 });
     }
 
-    if (payer.id === receiverId) {
+    if (me.id === otherUserId) {
       return Response.json(
         { error: "You cannot settle with yourself" },
         { status: 400 },
       );
     }
 
-    // If groupId provided, confirm both parties are members
-    if (groupId !== null) {
-      const [members] = await db.query<UserRow[]>(
-        `
-          SELECT user_id AS id FROM group_members
-          WHERE group_id = ? AND user_id IN (?, ?)
-        `,
-        [groupId, payer.id, receiverId],
-      );
+    // The current user is always one side of the settlement
+    const payerId = receiverIdInput !== null ? me.id : otherUserId;
+    const receiverId = receiverIdInput !== null ? otherUserId : me.id;
 
-      if (members.length < 2) {
-        return Response.json(
-          { error: "Both users must be members of the group" },
-          { status: 400 },
-        );
-      }
-    } else {
-      // Without a groupId just verify the receiver exists
-      const [[receiver]] = await db.query<UserRow[]>(
-        "SELECT id FROM users WHERE id = ? LIMIT 1",
-        [receiverId],
-      );
+    // Both parties must be members of the group
+    const [members] = await db.query<UserRow[]>(
+      `
+        SELECT user_id AS id FROM group_members
+        WHERE group_id = ? AND user_id IN (?, ?)
+      `,
+      [groupId, payerId, receiverId],
+    );
 
-      if (!receiver) {
-        return Response.json({ error: "Receiver not found" }, { status: 404 });
-      }
+    if (members.length < 2) {
+      return Response.json(
+        { error: "Both users must be members of the group" },
+        { status: 400 },
+      );
     }
 
     const [result] = await db.query<ResultSetHeader>(
       `
-        INSERT INTO settlements (payer_id, receiver_id, amount)
-        VALUES (?, ?, ?)
+        INSERT INTO settlements (payer_id, receiver_id, amount, group_id)
+        VALUES (?, ?, ?, ?)
       `,
-      [payer.id, receiverId, (amount / 100).toFixed(2)],
+      [payerId, receiverId, (amount / 100).toFixed(2), groupId],
     );
 
     return Response.json(

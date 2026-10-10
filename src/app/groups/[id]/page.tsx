@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { notFound, redirect } from "next/navigation";
 import type { RowDataPacket } from "mysql2";
@@ -6,11 +5,16 @@ import type { RowDataPacket } from "mysql2";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getGroupBalances } from "@/lib/balances";
-import type { Debt } from "@/lib/balances";
+import { detectSplit } from "@/lib/splits";
+import PageShell, { BackLink } from "@/components/PageShell";
+import Link from "next/link";
+
+import { ExpenseIcon } from "@/components/CategoryIcon";
+import { SettingsIcon } from "@/components/icons";
+import { firstName, formatINR } from "@/lib/format";
 import AddExpenseModal from "./AddExpenseModal";
 import EditExpenseModal from "./EditExpenseModal";
-import AddMemberForm from "./AddMemberForm";
-import SettleUpModal from "./SettleUpModal";
+import BalancesSection from "./BalancesSection";
 
 interface Group extends RowDataPacket {
   id: number;
@@ -24,6 +28,7 @@ interface GroupMember extends RowDataPacket {
   id: number;
   name: string;
   email: string;
+  image: string | null;
 }
 
 interface Expense extends RowDataPacket {
@@ -33,6 +38,18 @@ interface Expense extends RowDataPacket {
   created_at: Date;
   payer_name: string;
   paid_by: number;
+}
+
+/** 18/6/2026 */
+function formatShortDate(date: Date | string) {
+  const d = new Date(date);
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+interface SplitRow extends RowDataPacket {
+  expense_id: number;
+  user_id: number;
+  amount_owed: string;
 }
 
 export default async function GroupPage({
@@ -79,7 +96,7 @@ export default async function GroupPage({
 
   const [members] = await db.query<GroupMember[]>(
     `
-      SELECT users.id, users.name, users.email
+      SELECT users.id, users.name, users.email, users.image
       FROM group_members
       INNER JOIN users ON users.id = group_members.user_id
       WHERE group_members.group_id = ?
@@ -105,33 +122,45 @@ export default async function GroupPage({
     [groupId],
   );
 
-  const { debts } = await getGroupBalances(groupId);
+  // Stored splits for every expense, so the edit modal can show how each one
+  // was originally split.
+  const [splitRows] = await db.query<SplitRow[]>(
+    `
+      SELECT es.expense_id, es.user_id, es.amount_owed
+      FROM expense_splits es
+      INNER JOIN expenses e ON e.id = es.expense_id
+      WHERE e.group_id = ?
+    `,
+    [groupId],
+  );
+
+  const splitsByExpense = new Map<number, { userId: number; amountOwed: string }[]>();
+  for (const row of splitRows) {
+    const list = splitsByExpense.get(row.expense_id) ?? [];
+    list.push({ userId: row.user_id, amountOwed: row.amount_owed });
+    splitsByExpense.set(row.expense_id, list);
+  }
+
+  const { debts, simplifiedDebts } = await getGroupBalances(groupId);
   const currentUser = members.find((m) => m.email === session.user!.email);
-  const myDebts = debts.filter((d: Debt) => d.from.userId === currentUser?.id);
-  const owedToMe = debts.filter((d: Debt) => d.to.userId === currentUser?.id);
 
   const memberList = members.map((m) => ({ id: m.id, name: m.name, email: m.email }));
 
   return (
-    <main className="min-h-screen bg-[#141812]">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
-        <Link
-          className="flex w-fit items-center gap-1.5 text-sm font-medium text-[#EDEFE8]/50 transition-colors hover:text-[#EDEFE8]"
-          href="/groups"
-        >
-          ← Back to groups
-        </Link>
+    <PageShell>
+      <BackLink href="/groups">Back to all groups</BackLink>
 
-        {/* Group header */}
-        <header>
-          <p className="flex items-center gap-2 text-sm font-medium text-[#3FA873]">
-            <span className="h-px w-5 bg-[#3FA873]" />
+      {/* Group header */}
+      <header className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="tk-eyebrow">
+            <span className="h-px w-6 bg-accent" />
             Group
           </p>
-          <h1 className="mt-2 font-serif text-4xl font-semibold tracking-tight text-[#EDEFE8]">
+          <h1 className="mt-2 break-words text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
             {group.name}
           </h1>
-          <p className="mt-2 text-sm text-[#EDEFE8]/50">
+          <p className="mt-2 text-sm text-muted">
             Started by {group.creator_name} on{" "}
             {new Date(group.created_at).toLocaleDateString("en-US", {
               year: "numeric",
@@ -139,126 +168,76 @@ export default async function GroupPage({
               day: "numeric",
             })}
           </p>
-        </header>
+        </div>
 
-        {group.creator_email === session.user.email ? (
-          <div className="rounded-2xl border border-[#EDEFE8]/10 bg-[#1C211A] p-5">
-            <AddMemberForm groupId={group.id} />
-          </div>
-        ) : null}
+        <Link
+          aria-label="Group settings"
+          className="mt-8 flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-surface text-xl text-ink/85 transition-colors hover:border-accent/50 hover:text-ink"
+          href={`/groups/${group.id}/settings`}
+        >
+          <SettingsIcon />
+        </Link>
+      </header>
 
-        {/* Balances */}
-        <section className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">Balances</h2>
+      {/* Balances */}
+      <BalancesSection
+        groupId={groupId}
+        currentUserId={currentUser?.id ?? null}
+        debts={debts}
+        simplifiedDebts={simplifiedDebts}
+      />
 
-          {myDebts.length === 0 && owedToMe.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#EDEFE8]/15 bg-[#1C211A]/40 p-6 text-center">
-              <p className="text-sm text-[#EDEFE8]/50">Everyone&apos;s settled up. Nice and tidy.</p>
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {owedToMe.map((debt: Debt) => (
-                <li
-                  key={`owed-${debt.from.userId}`}
-                  className="relative flex items-center justify-between overflow-hidden rounded-xl border border-[#EDEFE8]/8 bg-[#1C211A] py-3.5 pl-5 pr-4"
+      {/* Expenses */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-2xl font-semibold tracking-tight text-ink">Expenses</h2>
+          <AddExpenseModal groupId={group.id} members={memberList} />
+        </div>
+
+        {expenses.length > 0 ? (
+          <ul className="flex flex-col gap-2.5">
+            {expenses.map((expense) => (
+              <li key={expense.id}>
+                <EditExpenseModal
+                  groupId={groupId}
+                  expense={{
+                    id: expense.id,
+                    description: expense.description ?? "",
+                    amount: expense.amount,
+                    paidByUserId: expense.paid_by,
+                    split: detectSplit(
+                      members.map((m) => m.id),
+                      splitsByExpense.get(expense.id) ?? [],
+                      Math.round(Number(expense.amount) * 100),
+                    ),
+                  }}
+                  members={memberList}
                 >
-                  <span className="absolute inset-y-0 left-0 w-[3px] bg-[#3FA873]" />
-                  <p className="text-sm text-[#EDEFE8]/75">
-                    <span className="font-medium text-[#EDEFE8]">{debt.from.name}</span> owes you
-                  </p>
-                  <span className="tabular-amount text-base font-medium text-[#3FA873]">
-                    ₹{debt.amount.toFixed(2)}
-                  </span>
-                </li>
-              ))}
-
-              {myDebts.map((debt: Debt) => (
-                <li
-                  key={`owe-${debt.to.userId}`}
-                  className="relative flex items-center justify-between overflow-hidden rounded-xl border border-[#EDEFE8]/8 bg-[#1C211A] py-3.5 pl-5 pr-4"
-                >
-                  <span className="absolute inset-y-0 left-0 w-[3px] bg-[#E0846F]" />
-                  <p className="text-sm text-[#EDEFE8]/75">
-                    You owe <span className="font-medium text-[#EDEFE8]">{debt.to.name}</span>
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <span className="tabular-amount text-base font-medium text-[#E0846F]">
-                      ₹{debt.amount.toFixed(2)}
-                    </span>
-                    <SettleUpModal groupId={groupId} receiver={debt.to} suggestedAmount={debt.amount} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Expenses */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">Expenses</h2>
-            <AddExpenseModal groupId={group.id} members={memberList} />
-          </div>
-
-          {expenses.length > 0 ? (
-            <ul className="flex flex-col gap-2">
-              {expenses.map((expense) => (
-                <li
-                  className="flex items-center justify-between rounded-xl border border-[#EDEFE8]/8 bg-[#1C211A] py-3.5 pl-5 pr-3"
-                  key={expense.id}
-                >
-                  <div>
-                    <p className="font-medium text-[#EDEFE8]">
+                  <ExpenseIcon />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-ink">
                       {expense.description || "Expense"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[#EDEFE8]/45">
-                      Paid by {expense.payer_name} · {new Date(expense.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="tabular-amount text-base font-medium text-[#EDEFE8]">
-                      ₹{Number(expense.amount).toFixed(2)}
                     </span>
-                    <EditExpenseModal
-                      groupId={groupId}
-                      expense={{
-                        id: expense.id,
-                        description: expense.description ?? "",
-                        amount: expense.amount,
-                        paidByUserId: expense.paid_by,
-                      }}
-                      members={memberList}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-[#EDEFE8]/15 bg-[#1C211A]/40 p-6 text-center">
-              <p className="text-sm text-[#EDEFE8]/50">No expenses yet. Add the first one above.</p>
-            </div>
-          )}
-        </section>
-
-        {/* Members */}
-        <section className="flex flex-col gap-3">
-          <h2 className="font-serif text-xl font-semibold text-[#EDEFE8]">Members</h2>
-          <ul className="flex flex-wrap gap-2">
-            {members.map((member) => (
-              <li
-                key={member.id}
-                className="flex items-center gap-2 rounded-full border border-[#EDEFE8]/10 bg-[#1C211A] px-3 py-1.5 text-sm"
-              >
-                <span className="flex size-5 items-center justify-center rounded-full bg-[#3FA873]/15 text-[10px] font-semibold text-[#3FA873]">
-                  {member.name.charAt(0).toUpperCase()}
-                </span>
-                <span className="font-medium text-[#EDEFE8]">{member.name}</span>
-                <span className="text-[#EDEFE8]/40">{member.email}</span>
+                    <span className="mt-0.5 block truncate text-xs text-muted sm:text-sm">
+                      Paid by{" "}
+                      <span className="sm:hidden">{firstName(expense.payer_name)}</span>
+                      <span className="hidden sm:inline">{expense.payer_name}</span> ·{" "}
+                      {formatShortDate(expense.created_at)}
+                    </span>
+                  </span>
+                  <span className="tabular-amount text-base font-semibold text-ink sm:text-lg">
+                    {formatINR(Number(expense.amount), 2)}
+                  </span>
+                </EditExpenseModal>
               </li>
             ))}
           </ul>
-        </section>
-      </div>
-    </main>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-white/15 bg-surface/40 p-8 text-center">
+            <p className="text-sm text-muted">No expenses yet. Add the first one above.</p>
+          </div>
+        )}
+      </section>
+    </PageShell>
   );
 }
