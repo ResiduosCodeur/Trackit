@@ -20,11 +20,13 @@ export default function SettingsMembers({
   members,
   creatorId,
   currentUserId,
+  canAdd,
 }: {
   groupId: number;
   members: Member[];
   creatorId: number;
   currentUserId: number | null;
+  canAdd: boolean;
 }) {
   const router = useRouter();
   const isCreator = currentUserId === creatorId;
@@ -89,7 +91,7 @@ export default function SettingsMembers({
           Members ({members.length})
         </h2>
 
-        {isCreator && !isAdding ? (
+        {canAdd && !isAdding ? (
           <button
             className="flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-sm font-medium text-ink/90 transition-colors hover:border-accent/50 hover:text-ink"
             type="button"
@@ -102,7 +104,7 @@ export default function SettingsMembers({
         ) : null}
       </div>
 
-      {isAdding ? (
+      {canAdd && isAdding ? (
         <div className="mt-4">
           <AddMemberForm groupId={groupId} onDone={() => setIsAdding(false)} />
         </div>

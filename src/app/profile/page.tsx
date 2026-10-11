@@ -8,6 +8,7 @@ import { CalendarIcon, LogOutIcon, MailIcon, UserIcon } from "@/components/icons
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+import ProfileNameEditor from "./ProfileNameEditor";
 import SignOutButton from "./SignOutButton";
 import PasswordSection from "./Passwordsection";
 
@@ -63,9 +64,7 @@ export default async function ProfilePage() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
               Your profile
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              {user.name}
-            </h1>
+            <ProfileNameEditor name={user.name} />
             <p className="mt-1 break-all text-muted sm:text-lg">{user.email}</p>
           </div>
         </div>

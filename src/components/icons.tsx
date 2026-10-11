@@ -240,3 +240,10 @@ export const MoreVerticalIcon = (p: IconProps) => (
     <circle cx="12" cy="19" r="1.800" />
   </Solid>
 );
+
+export const ShieldIcon = (p: IconProps) => (
+  <Stroke {...p}>
+    <path d="M12 3 5 6v5c0 4.500 3 8 7 10 4-2 7-5.500 7-10V6z" />
+    <path d="m9 12 2.200 2.200L15.500 10" />
+  </Stroke>
+);

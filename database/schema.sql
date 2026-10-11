@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS user_groups (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     created_by INT NOT NULL,
+    allow_member_rename TINYINT(1) NOT NULL DEFAULT 1,
+    allow_member_add TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (created_by)

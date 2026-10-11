@@ -3,12 +3,9 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2";
 
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { accessErrorResponse, getGroupAccess } from "@/lib/groupAccess";
 
 interface UserId extends RowDataPacket {
-  id: number;
-}
-
-interface OwnedGroup extends RowDataPacket {
   id: number;
 }
 
@@ -50,20 +47,15 @@ export async function POST(
       );
     }
 
-    const [groups] = await db.query<OwnedGroup[]>(
-      `
-        SELECT user_groups.id
-        FROM user_groups
-        INNER JOIN users AS creator ON creator.id = user_groups.created_by
-        WHERE user_groups.id = ? AND creator.email = ?
-        LIMIT 1
-      `,
-      [groupId, session.user.email],
-    );
+    const access = await getGroupAccess(groupId, session.user.email);
 
-    if (groups.length === 0) {
+    if (typeof access === "string") {
+      return accessErrorResponse(access);
+    }
+
+    if (!access.isCreator && !access.allowMemberAdd) {
       return Response.json(
-        { error: "Only the group creator can add members" },
+        { error: "The group leader has turned off adding members" },
         { status: 403 },
       );
     }

@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { getGroupBalances } from "@/lib/balances";
 import { db } from "@/lib/db";
 import { formatINR } from "@/lib/format";
+import { deleteGroupRows } from "@/lib/groupDelete";
 
 interface GroupRow extends RowDataPacket {
   created_by: number;
@@ -18,11 +19,13 @@ interface UserRow extends RowDataPacket {
  * DELETE /api/groups/[id]/members/[userId]
  *
  * - userId is the current user  → they leave the group
- * - userId is someone else      → only the group creator may remove them
+ * - userId is someone else      → only the group leader may remove them
  *
- * The group creator cannot be removed or leave, and nobody can go while they
- * still owe or are owed money in the group (that would leave balances nobody
- * can settle).
+ * Nobody can go while they still owe or are owed money in the group (that
+ * would leave balances nobody can settle).
+ *
+ * When the leader leaves, leadership passes to the remaining member with the
+ * oldest account; if they were the only member, the group is deleted.
  */
 export async function DELETE(
   _request: Request,
@@ -87,16 +90,9 @@ export async function DELETE(
 
     const isSelf = targetId === me.id;
 
-    if (targetId === creatorId) {
-      return Response.json(
-        { error: "The group creator can't be removed or leave the group" },
-        { status: 400 },
-      );
-    }
-
     if (!isSelf && me.id !== creatorId) {
       return Response.json(
-        { error: "Only the group creator can remove members" },
+        { error: "Only the group leader can remove members" },
         { status: 403 },
       );
     }
@@ -119,12 +115,57 @@ export async function DELETE(
       );
     }
 
-    await db.query("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", [
-      groupId,
-      targetId,
-    ]);
+    if (targetId !== creatorId) {
+      await db.query("DELETE FROM group_members WHERE group_id = ? AND user_id = ?", [
+        groupId,
+        targetId,
+      ]);
 
-    return Response.json({ success: true });
+      return Response.json({ success: true });
+    }
+
+    // The leader is leaving: hand the group over, or delete it if they're alone
+    const [others] = await db.query<UserRow[]>(
+      `
+        SELECT user_id AS id FROM group_members
+        WHERE group_id = ? AND user_id <> ?
+        ORDER BY user_id
+        LIMIT 1
+      `,
+      [groupId, creatorId],
+    );
+
+    const connection = await db.getConnection();
+
+    try {
+      await connection.beginTransaction();
+
+      if (others.length === 0) {
+        await deleteGroupRows(connection, groupId);
+      } else {
+        await connection.query("UPDATE user_groups SET created_by = ? WHERE id = ?", [
+          others[0].id,
+          groupId,
+        ]);
+        await connection.query(
+          "DELETE FROM group_members WHERE group_id = ? AND user_id = ?",
+          [groupId, creatorId],
+        );
+      }
+
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return Response.json({
+      success: true,
+      groupDeleted: others.length === 0,
+      newLeaderId: others[0]?.id ?? null,
+    });
   } catch (error) {
     console.error(error);
     return Response.json({ error: "Internal server error" }, { status: 500 });

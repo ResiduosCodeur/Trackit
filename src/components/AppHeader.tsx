@@ -1,8 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getServerSession } from "next-auth";
 
-import { authOptions } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/currentUser";
 import { NotificationBell, UserMenu } from "./HeaderMenus";
 
 export function Logo({ className = "" }: { className?: string }) {
@@ -15,10 +14,10 @@ export function Logo({ className = "" }: { className?: string }) {
 }
 
 export default async function AppHeader() {
-  const session = await getServerSession(authOptions);
-  const name = session?.user?.name ?? "Account";
-  const email = session?.user?.email ?? "";
-  const image = session?.user?.image ?? null;
+  const user = await getCurrentUser();
+  const name = user?.name ?? "Account";
+  const email = user?.email ?? "";
+  const image = user?.image ?? null;
 
   return (
     <header className="flex items-center justify-between gap-3 py-5 sm:py-6">

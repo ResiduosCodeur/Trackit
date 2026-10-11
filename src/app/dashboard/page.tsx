@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import { ArrowRightIcon } from "@/components/icons";
 import { authOptions } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/currentUser";
 import { firstName } from "@/lib/format";
 import { getGroupSummaries } from "@/lib/groupSummaries";
 import CreateGroupButton from "./CreateGroupButton";
@@ -21,6 +22,7 @@ export default async function Dashboard() {
     redirect("/");
   }
 
+  const user = await getCurrentUser();
   const groups = await getGroupSummaries(session.user.email);
   const shown = groups.slice(0, DASHBOARD_GROUP_LIMIT);
 
@@ -34,8 +36,7 @@ export default async function Dashboard() {
           </span>
         </p>
         <h1 className="mt-1 flex items-center gap-3 text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
-          {firstName(session.user.name) || "there"}
-          
+          {firstName(user?.name ?? session.user.name) || "there"}
         </h1>
         <p className="mt-2 text-muted sm:text-lg">
           Keep track of shared expenses, all in one place.
