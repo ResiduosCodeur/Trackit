@@ -2,7 +2,10 @@
 
 import ModalShell from "./ModalShell";
 
-/** Yes / No confirmation. Keep `error` for failures reported by the server. */
+/**
+ * Yes / No confirmation. When the server reports a problem (`error`), the
+ * Yes / No pair is replaced by a single "Ok" button that closes the dialog.
+ */
 export default function ConfirmDialog({
   title,
   message,
@@ -27,29 +30,42 @@ export default function ConfirmDialog({
       <p className="text-muted">{message}</p>
 
       {error ? (
-        <p className="tk-error mt-4" role="alert">
-          {error}
-        </p>
-      ) : null}
+        <>
+          <p className="tk-error mt-4" role="alert">
+            {error}
+          </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <button
-          className="tk-btn bg-white/6 text-ink hover:bg-white/10 !py-3"
-          disabled={busy}
-          type="button"
-          onClick={onNo}
-        >
-          {noLabel}
-        </button>
-        <button
-          className="tk-btn bg-neg text-white hover:bg-neg/85 !py-3"
-          disabled={busy}
-          type="button"
-          onClick={onYes}
-        >
-          {busy ? "Please wait..." : yesLabel}
-        </button>
-      </div>
+          <div className="mt-6">
+            <button
+              autoFocus
+              className="tk-btn-primary w-full !py-3"
+              type="button"
+              onClick={onNo}
+            >
+              Ok
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <button
+            className="tk-btn bg-white/6 text-ink hover:bg-white/10 !py-3"
+            disabled={busy}
+            type="button"
+            onClick={onNo}
+          >
+            {noLabel}
+          </button>
+          <button
+            className="tk-btn bg-neg text-white hover:bg-neg/85 !py-3"
+            disabled={busy}
+            type="button"
+            onClick={onYes}
+          >
+            {busy ? "Please wait..." : yesLabel}
+          </button>
+        </div>
+      )}
     </ModalShell>
   );
 }
