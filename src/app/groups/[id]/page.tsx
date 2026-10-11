@@ -10,7 +10,7 @@ import PageShell, { BackLink } from "@/components/PageShell";
 import Link from "next/link";
 import { cookies } from "next/headers";
 
-import { ExpenseIcon } from "@/components/CategoryIcon";
+import { ExpenseIcon, SettleIcon } from "@/components/CategoryIcon";
 import { SettingsIcon } from "@/components/icons";
 import { firstName, formatINR } from "@/lib/format";
 import AddExpenseModal from "./AddExpenseModal";
@@ -39,6 +39,16 @@ interface Expense extends RowDataPacket {
   created_at: Date;
   payer_name: string;
   paid_by: number;
+}
+
+interface SettlementRow extends RowDataPacket {
+  id: number;
+  amount: string;
+  created_at: Date;
+  payer_id: number;
+  payer_name: string;
+  receiver_id: number;
+  receiver_name: string;
 }
 
 /** 18/6/2026 */
@@ -145,10 +155,51 @@ export default async function GroupPage({
     splitsByExpense.set(row.expense_id, list);
   }
 
+  // Settled-up payments recorded in this group (older rows without a group_id
+  // are matched by membership, same as the balances)
+  const [settlements] = await db.query<SettlementRow[]>(
+    `
+      SELECT
+        s.id,
+        s.amount,
+        s.created_at,
+        s.payer_id,
+        payer.name AS payer_name,
+        s.receiver_id,
+        receiver.name AS receiver_name
+      FROM settlements s
+      INNER JOIN users payer ON payer.id = s.payer_id
+      INNER JOIN users receiver ON receiver.id = s.receiver_id
+      WHERE s.group_id = ?
+         OR (
+           s.group_id IS NULL
+           AND s.payer_id IN (SELECT user_id FROM group_members WHERE group_id = ?)
+           AND s.receiver_id IN (SELECT user_id FROM group_members WHERE group_id = ?)
+         )
+    `,
+    [groupId, groupId, groupId],
+  );
+
   const { debts, simplifiedDebts } = await getGroupBalances(groupId);
   const currentUser = members.find((m) => m.email === session.user!.email);
   const simplifiedPref =
     (await cookies()).get(`simplify_${groupId}`)?.value === "1";
+
+  // Expenses and settlements in one list, newest first
+  const feed = [
+    ...expenses.map((expense) => ({
+      kind: "expense" as const,
+      at: new Date(expense.created_at).getTime(),
+      key: `e-${expense.id}`,
+      expense,
+    })),
+    ...settlements.map((settlement) => ({
+      kind: "settlement" as const,
+      at: new Date(settlement.created_at).getTime(),
+      key: `s-${settlement.id}`,
+      settlement,
+    })),
+  ].sort((a, b) => b.at - a.at);
 
   const memberList = members.map((m) => ({
     id: m.id,
@@ -202,58 +253,88 @@ export default async function GroupPage({
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-2xl font-semibold tracking-tight text-ink">
-            Expenses
+            Logs
           </h2>
           <AddExpenseModal groupId={group.id} members={memberList} />
         </div>
 
-        {expenses.length > 0 ? (
+        {feed.length > 0 ? (
           <ul className="flex flex-col gap-2.5">
-            {expenses.map((expense) => (
-              <li key={expense.id}>
-                <EditExpenseModal
-                  groupId={groupId}
-                  expense={{
-                    id: expense.id,
-                    description: expense.description ?? "",
-                    amount: expense.amount,
-                    paidByUserId: expense.paid_by,
-                    split: detectSplit(
-                      members.map((m) => m.id),
-                      splitsByExpense.get(expense.id) ?? [],
-                      Math.round(Number(expense.amount) * 100),
-                    ),
-                  }}
-                  members={memberList}
-                >
-                  <ExpenseIcon />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold text-ink">
-                      {expense.description || "Expense"}
+            {feed.map((item) => {
+              if (item.kind === "settlement") {
+                const { settlement } = item;
+                const youPaid = settlement.payer_id === currentUser?.id;
+                const youReceived = settlement.receiver_id === currentUser?.id;
+
+                return (
+                  <li key={item.key}>
+                    <div className="tk-card flex w-full items-center gap-3 p-3.5 sm:gap-4 sm:p-4">
+                      <SettleIcon />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-ink">
+                          {youPaid ? "You" : settlement.payer_name} paid{" "}
+                          {youReceived ? "you" : settlement.receiver_name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted sm:text-sm">
+                          Settlement · {formatShortDate(settlement.created_at)}
+                        </span>
+                      </span>
+                      <span className="tabular-amount text-base font-semibold text-pos sm:text-lg">
+                        {formatINR(Number(settlement.amount), 2)}
+                      </span>
+                    </div>
+                  </li>
+                );
+              }
+
+              const { expense } = item;
+
+              return (
+                <li key={item.key}>
+                  <EditExpenseModal
+                    groupId={groupId}
+                    expense={{
+                      id: expense.id,
+                      description: expense.description ?? "",
+                      amount: expense.amount,
+                      paidByUserId: expense.paid_by,
+                      split: detectSplit(
+                        members.map((m) => m.id),
+                        splitsByExpense.get(expense.id) ?? [],
+                        Math.round(Number(expense.amount) * 100),
+                      ),
+                    }}
+                    members={memberList}
+                  >
+                    <ExpenseIcon />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-ink">
+                        {expense.description || "Expense"}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-muted sm:text-sm">
+                        Paid by{" "}
+                        {expense.paid_by === currentUser?.id ? (
+                          "you"
+                        ) : (
+                          <>
+                            <span className="sm:hidden">
+                              {firstName(expense.payer_name)}
+                            </span>
+                            <span className="hidden sm:inline">
+                              {expense.payer_name}
+                            </span>
+                          </>
+                        )}{" "}
+                        · {formatShortDate(expense.created_at)}
+                      </span>
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted sm:text-sm">
-                      Paid by{" "}
-                      {expense.paid_by === currentUser?.id ? (
-                        "you"
-                      ) : (
-                        <>
-                          <span className="sm:hidden">
-                            {firstName(expense.payer_name)}
-                          </span>
-                          <span className="hidden sm:inline">
-                            {expense.payer_name}
-                          </span>
-                        </>
-                      )}{" "}
-                      · {formatShortDate(expense.created_at)}
+                    <span className="tabular-amount text-base font-semibold text-ink sm:text-lg">
+                      {formatINR(Number(expense.amount), 2)}
                     </span>
-                  </span>
-                  <span className="tabular-amount text-base font-semibold text-ink sm:text-lg">
-                    {formatINR(Number(expense.amount), 2)}
-                  </span>
-                </EditExpenseModal>
-              </li>
-            ))}
+                  </EditExpenseModal>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <div className="rounded-2xl border border-dashed border-white/15 bg-surface/40 p-8 text-center">

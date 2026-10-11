@@ -30,10 +30,10 @@ html {
 
 body {
   background-color: #0a0d15;
-  background-image:
+  /* background-image:
     radial-gradient(900px 420px at 18% -8%, rgba(117, 102, 241, 0.13), transparent 70%),
     radial-gradient(700px 380px at 100% 0%, rgba(117, 102, 241, 0.06), transparent 70%);
-  background-repeat: no-repeat;
+  background-repeat: no-repeat; */
   color: #eef0f8;
   font-family: var(--font-sans);
 }
