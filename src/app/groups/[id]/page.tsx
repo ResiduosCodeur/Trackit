@@ -8,6 +8,7 @@ import { getGroupBalances } from "@/lib/balances";
 import { detectSplit } from "@/lib/splits";
 import PageShell, { BackLink } from "@/components/PageShell";
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 import { ExpenseIcon } from "@/components/CategoryIcon";
 import { SettingsIcon } from "@/components/icons";
@@ -134,7 +135,10 @@ export default async function GroupPage({
     [groupId],
   );
 
-  const splitsByExpense = new Map<number, { userId: number; amountOwed: string }[]>();
+  const splitsByExpense = new Map<
+    number,
+    { userId: number; amountOwed: string }[]
+  >();
   for (const row of splitRows) {
     const list = splitsByExpense.get(row.expense_id) ?? [];
     list.push({ userId: row.user_id, amountOwed: row.amount_owed });
@@ -143,8 +147,14 @@ export default async function GroupPage({
 
   const { debts, simplifiedDebts } = await getGroupBalances(groupId);
   const currentUser = members.find((m) => m.email === session.user!.email);
+  const simplifiedPref =
+    (await cookies()).get(`simplify_${groupId}`)?.value === "1";
 
-  const memberList = members.map((m) => ({ id: m.id, name: m.name, email: m.email }));
+  const memberList = members.map((m) => ({
+    id: m.id,
+    name: m.name,
+    email: m.email,
+  }));
 
   return (
     <PageShell>
@@ -185,12 +195,15 @@ export default async function GroupPage({
         currentUserId={currentUser?.id ?? null}
         debts={debts}
         simplifiedDebts={simplifiedDebts}
+        initialSimplified={simplifiedPref}
       />
 
       {/* Expenses */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-2xl font-semibold tracking-tight text-ink">Expenses</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-ink">
+            Expenses
+          </h2>
           <AddExpenseModal groupId={group.id} members={memberList} />
         </div>
 
@@ -220,9 +233,19 @@ export default async function GroupPage({
                     </span>
                     <span className="mt-0.5 block truncate text-xs text-muted sm:text-sm">
                       Paid by{" "}
-                      <span className="sm:hidden">{firstName(expense.payer_name)}</span>
-                      <span className="hidden sm:inline">{expense.payer_name}</span> ·{" "}
-                      {formatShortDate(expense.created_at)}
+                      {expense.paid_by === currentUser?.id ? (
+                        "you"
+                      ) : (
+                        <>
+                          <span className="sm:hidden">
+                            {firstName(expense.payer_name)}
+                          </span>
+                          <span className="hidden sm:inline">
+                            {expense.payer_name}
+                          </span>
+                        </>
+                      )}{" "}
+                      · {formatShortDate(expense.created_at)}
                     </span>
                   </span>
                   <span className="tabular-amount text-base font-semibold text-ink sm:text-lg">
@@ -234,7 +257,9 @@ export default async function GroupPage({
           </ul>
         ) : (
           <div className="rounded-2xl border border-dashed border-white/15 bg-surface/40 p-8 text-center">
-            <p className="text-sm text-muted">No expenses yet. Add the first one above.</p>
+            <p className="text-sm text-muted">
+              No expenses yet. Add the first one above.
+            </p>
           </div>
         )}
       </section>

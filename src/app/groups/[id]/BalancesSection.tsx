@@ -12,6 +12,7 @@ export default function BalancesSection({
   currentUserId,
   debts,
   simplifiedDebts,
+  initialSimplified = false,
 }: {
   groupId: number;
   currentUserId: number | null;
@@ -19,8 +20,17 @@ export default function BalancesSection({
   debts: Debt[];
   /** Fewest-transfers version of the same balances */
   simplifiedDebts: Debt[];
+  /** Remembered choice, read from a cookie on the server */
+  initialSimplified?: boolean;
 }) {
-  const [simplified, setSimplified] = useState(false);
+  const [simplified, setSimplified] = useState(initialSimplified);
+
+  function toggleSimplified() {
+    const next = !simplified;
+    setSimplified(next);
+    // Remember the choice for this group (1 year) so a reload keeps it
+    document.cookie = `simplify_${groupId}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+  }
 
   const shown = simplified ? simplifiedDebts : debts;
   // Rows that involve the current user come first
@@ -41,7 +51,7 @@ export default function BalancesSection({
             className="flex items-center gap-2 rounded-xl border border-white/10 bg-surface px-3.5 py-2 text-sm font-medium text-ink/90 transition-colors hover:border-accent/50 hover:text-ink"
             type="button"
             aria-pressed={simplified}
-            onClick={() => setSimplified((value) => !value)}
+            onClick={toggleSimplified}
           >
             <SwapIcon className="text-base text-accent" />
             {simplified ? "Show original debts" : "Simplify debts"}
@@ -77,13 +87,25 @@ export default function BalancesSection({
 
                 <p className="min-w-0 flex-1 break-words text-sm text-muted sm:text-[0.95rem]">
                   <span className="font-semibold text-ink">
-                    <span className="sm:hidden">{firstName(debt.from.name)}</span>
-                    <span className="hidden sm:inline">{debt.from.name}</span>
+                    {iOwe ? (
+                      "You"
+                    ) : (
+                      <>
+                        <span className="sm:hidden">{firstName(debt.from.name)}</span>
+                        <span className="hidden sm:inline">{debt.from.name}</span>
+                      </>
+                    )}
                   </span>{" "}
-                  owes{" "}
+                  {iOwe ? "owe" : "owes"}{" "}
                   <span className="font-semibold text-ink">
-                    <span className="sm:hidden">{firstName(debt.to.name)}</span>
-                    <span className="hidden sm:inline">{debt.to.name}</span>
+                    {owedToMe ? (
+                      "you"
+                    ) : (
+                      <>
+                        <span className="sm:hidden">{firstName(debt.to.name)}</span>
+                        <span className="hidden sm:inline">{debt.to.name}</span>
+                      </>
+                    )}
                   </span>
                 </p>
 
