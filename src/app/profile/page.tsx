@@ -4,13 +4,19 @@ import type { RowDataPacket } from "mysql2";
 
 import Avatar from "@/components/Avatar";
 import PageShell, { BackLink } from "@/components/PageShell";
-import { CalendarIcon, LogOutIcon, MailIcon, UserIcon } from "@/components/icons";
+import {
+  CalendarIcon,
+  LogOutIcon,
+  MailIcon,
+  UserIcon,
+} from "@/components/icons";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 import ProfileNameEditor from "./ProfileNameEditor";
 import SignOutButton from "./SignOutButton";
 import PasswordSection from "./Passwordsection";
+import DeleteAccountButton from "./DeleteAccountButton";
 
 interface UserProfile extends RowDataPacket {
   name: string;
@@ -57,7 +63,12 @@ export default async function ProfilePage() {
       <section className="tk-card overflow-hidden bg-gradient-to-br from-accent-strong/12 via-surface to-surface">
         <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:gap-7 sm:p-8">
           <span className="w-fit rounded-full bg-accent-strong/20 p-1.5 ring-1 ring-accent/40">
-            <Avatar name={user.name} seed={user.email} image={user.image} size={96} />
+            <Avatar
+              name={user.name}
+              seed={user.email}
+              image={user.image}
+              size={96}
+            />
           </span>
 
           <div className="min-w-0">
@@ -81,7 +92,9 @@ export default async function ProfilePage() {
                 <dt className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-muted">
                   {label}
                 </dt>
-                <dd className="mt-0.5 break-all font-medium text-ink">{value}</dd>
+                <dd className="mt-0.5 break-all font-medium text-ink">
+                  {value}
+                </dd>
               </div>
             </div>
           ))}
@@ -102,11 +115,24 @@ export default async function ProfilePage() {
             </span>
             <div>
               <h2 className="text-lg font-semibold text-ink">Sign out</h2>
-              <p className="mt-1 text-sm text-muted">End your session on this device.</p>
+              <p className="mt-1 text-sm text-muted">
+                End your session on this device.
+              </p>
             </div>
           </div>
           <div className="mt-6">
             <SignOutButton />
+          </div>
+
+          <div className="mt-6 border-t border-white/8 pt-6">
+            <h3 className="font-semibold text-ink">Delete account</h3>
+            <p className="mt-1 text-sm text-muted">
+              Permanently remove your account. Possible only when you&apos;re
+              settled up in every group.
+            </p>
+            <div className="mt-4">
+              <DeleteAccountButton />
+            </div>
           </div>
         </section>
       </div>
